@@ -80,6 +80,9 @@ export interface StudioRows {
     texture_path: string | null;
     motif_cm: number | null;
     finition: string | null;
+    marque: string | null;
+    gamme: string | null;
+    usage: "mur" | "plafond" | "porte" | "cadre" | "sol" | "autre" | null;
     created_at: string;
     updated_at: string;
   };

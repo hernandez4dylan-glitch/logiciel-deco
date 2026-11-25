@@ -122,6 +122,84 @@ class PeintureTests(unittest.TestCase):
             finitions.appliquer(img, [{'masque': mur.astype(np.float32), 'type': 'papier'}])
 
 
+class FinitionTests(unittest.TestCase):
+    """Mat, velours, satiné, brillant : différence visible et ordonnée ; porte/cadre/sol."""
+
+    def porte_sur_sol_clair(self):
+        img, mur, porte = piece()
+        h, w = mur.shape
+        img[int(0.68 * h):] = (215, 222, 228)  # sol clair qui se reflète
+        m = np.zeros((h, w), np.float32)
+        m[porte] = 1
+        return img, m, porte
+
+    def test_finitions_ordonnees_et_visibles(self):
+        img, m, porte = self.porte_sur_sol_clair()
+        rendu = {f: finitions.appliquer(img, [{'masque': m, 'type': 'peinture', 'couleur': '#1F2A3A',
+                                              'finition': f, 'surface': 'porte'}]).astype(float)
+                 for f in finitions.FINITIONS}
+        ecart = {f: np.abs(rendu[f][porte] - rendu['mat'][porte]).mean() for f in finitions.FINITIONS}
+        self.assertLess(ecart['velours'], ecart['satin'])
+        self.assertLess(ecart['satin'], ecart['brillant'])
+        self.assertGreater(ecart['brillant'], 4, 'différence nette en brillant')
+        # Le reflet du sol est plus fort en bas de la porte qu'en haut.
+        h0, h1 = porte[0].start, porte[0].stop
+        d = (rendu['brillant'] - rendu['mat']).mean(2)
+        cols = porte[1]
+        self.assertGreater(d[h1 - 8:h1 - 2, cols].mean(), d[h0 + 2:h0 + 8, cols].mean() + 2)
+        # En mat, la teinte foncée reste foncée (pas de voile laiteux).
+        self.assertLess(rendu['mat'][porte].mean(), 70)
+
+    def test_finition_inconnue(self):
+        img, m, _ = self.porte_sur_sol_clair()
+        with self.assertRaises(ValueError):
+            finitions.appliquer(img, [{'masque': m, 'type': 'peinture', 'couleur': '#FFFFFF', 'finition': 'vernis'}])
+
+    def test_finition_par_defaut_selon_la_surface(self):
+        img, m, porte = self.porte_sur_sol_clair()
+        defaut = finitions.appliquer(img, [{'masque': m, 'type': 'peinture', 'couleur': '#1F2A3A', 'surface': 'porte'}])
+        satin = finitions.appliquer(img, [{'masque': m, 'type': 'peinture', 'couleur': '#1F2A3A', 'finition': 'satin', 'surface': 'porte'}])
+        self.assertTrue(np.array_equal(defaut, satin))
+
+    def test_cadre_sur_le_contour_exterieur(self):
+        h, w = 200, 160
+        m = np.zeros((h, w), np.float32)
+        m[20:200, 30:130] = 1
+        m[80:100, 60:90] = 0  # lettre collée : un trou, pas un cadre
+        feuille, cadre = finitions.separer_cadre(m, 8)
+        self.assertGreater(cadre[20:26, 40:120].mean(), 0.9, 'cadre en haut')
+        self.assertGreater(cadre[60:150, 31:36].mean(), 0.9, 'cadre à gauche')
+        self.assertLess(cadre[190:200, 50:110].mean(), 0.05, 'pas de cadre côté sol')
+        self.assertLess(cadre[70:110, 50:100].mean(), 0.05, 'pas de cadre autour de la lettre')
+        self.assertTrue(np.allclose(feuille + cadre, m, atol=1e-3))
+
+    def test_baguette_reprend_l_interieur_des_lettres(self):
+        img, mur, porte = piece()
+        h, w = mur.shape
+        y0, x0 = porte[0].start + 30, porte[1].start + 12
+        # Lettre « O » orange collée sur la porte, son intérieur est de la couleur de la porte.
+        cv2.rectangle(img, (x0, y0), (x0 + 14, y0 + 16), (40, 110, 230), 3)  # ~5 % de la hauteur
+        plus = np.zeros((h, w), bool)
+        plus[porte[0].start + 5:porte[0].start + 9, porte[1].start + 5:porte[1].start + 9] = True
+        m = finitions.selectionner(img, plus, np.zeros((h, w), bool)) > 0.5
+        self.assertGreater(m[y0 + 5:y0 + 12, x0 + 5:x0 + 10].mean(), 0.8, 'intérieur repris')
+        self.assertLess(m[y0 + 4:y0 + 13, x0 - 1:x0 + 2].mean(), 0.5, 'la lettre reste exclue')
+
+    def test_sol_en_perspective(self):
+        img, mur, _ = piece()
+        h, w = mur.shape
+        sol = np.zeros((h, w), np.float32)
+        sol[int(0.68 * h):] = 1
+        parquet = cv2.imread(str(LOCAL.parent / 'public' / 'images' / 'motifs' / 'parquet-chene.jpg'))
+        self.assertIsNotNone(parquet, 'parquet livré manquant')
+        quad = [(100, int(0.68 * h)), (320, int(0.68 * h)), (w + 200, h), (-200, h)]
+        res = finitions.appliquer(img, [{'masque': sol, 'type': 'sol', 'texture': parquet, 'quad': quad,
+                                         'repetitions': 3, 'surface': 'sol'}])
+        zone = res[int(0.7 * h):].astype(float).reshape(-1, 3).mean(0)
+        self.assertGreater(zone[2], zone[0] + 15, 'teinte bois (plus rouge que bleu)')
+        self.assertTrue(np.array_equal(res[:int(0.66 * h)], img[:int(0.66 * h)]))
+
+
 class DetourageTests(unittest.TestCase):
     def test_detourage_alpha_et_couleurs(self):
         img = np.full((240, 240, 3), (60, 170, 60), np.uint8)  # fond vert
@@ -166,6 +244,16 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(aff.shape, (h, w))
         fin = png(photo.render({'image': data_url(img), 'mode': 'finish', 'zones': [{'mask': data_url(sel), 'type': 'peinture', 'couleur': '#A9B5A0', 'lumiere': 1}]}))
         self.assertEqual(fin.shape, img.shape)
+        porte = np.zeros((h, w), np.uint8)
+        porte[60:h, 200:300] = 255
+        cadre = png(photo.render({'image': data_url(img), 'mode': 'cadre', 'mask': data_url(porte), 'epaisseur': 10, 'partie': 'cadre'}))
+        feuille = png(photo.render({'image': data_url(img), 'mode': 'cadre', 'mask': data_url(porte), 'epaisseur': 10, 'partie': 'porte'}))
+        self.assertGreater(cadre[62:68, 220:280].mean(), 200)
+        self.assertGreater(feuille[150:200, 230:270].mean(), 200)
+        fin2 = png(photo.render({'image': data_url(img), 'mode': 'finish', 'zones': [
+            {'mask': data_url(feuille), 'type': 'peinture', 'couleur': '#2F4A3E', 'finition': 'brillant', 'surface': 'porte'},
+            {'mask': data_url(cadre), 'type': 'peinture', 'couleur': '#FFFFFF', 'finition': 'satin', 'surface': 'cadre'}]}))
+        self.assertEqual(fin2.shape, img.shape)
         vierge = cv2.imdecode(np.frombuffer(photo.render({'mode': 'vierge', 'width': 600, 'height': 400}), np.uint8), cv2.IMREAD_COLOR)
         self.assertEqual(vierge.shape, (400, 600, 3))
         cut = png(photo.render({'image': data_url(img), 'mode': 'cutout'}))
@@ -177,6 +265,9 @@ class ApiTests(unittest.TestCase):
             {'mode': 'finish', 'zones': [{'mask': data_url(sel), 'type': 'peinture', 'couleur': 'beige'}]},
             {'mode': 'finish', 'zones': [{'mask': data_url(sel), 'type': 'papier', 'quad': [[0, 0], [1, 1]]}]},
             {'mode': 'affiner', 'mask': data_url(np.zeros((10, 10), np.uint8))},
+            {'mode': 'finish', 'zones': [{'mask': data_url(sel), 'type': 'peinture', 'couleur': '#FFFFFF', 'finition': 'laque'}]},
+            {'mode': 'finish', 'zones': [{'mask': data_url(sel), 'type': 'peinture', 'couleur': '#FFFFFF', 'surface': 'toit'}]},
+            {'mode': 'cadre', 'mask': data_url(sel), 'partie': 'poignée'},
         ):
             with self.assertRaises(ValueError, msg=str(bad)):
                 photo.render({'image': data_url(img), **bad})

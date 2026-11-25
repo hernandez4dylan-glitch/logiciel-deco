@@ -9,7 +9,7 @@ Ils appliquent des méthodes publiées (remplissage par exemplaires de Criminisi
 GrabCut de Rother, Kolmogorov et Blake, 2004, et détecteur de contours de Sobel, fournis par OpenCV ;
 filtre guidé de He, Sun et Tang, 2010) avec NumPy, OpenCV et le modèle U²-Net déjà inclus : aucun code,
 modèle ni bibliothèque supplémentaire n'est embarqué.
-Les motifs d'exemple public/images/motifs/feuillage.png et enduit-taloche.jpg sont générés par
+Les motifs d'exemple public/images/motifs/feuillage.png, enduit-taloche.jpg et parquet-chene.jpg sont générés par
 local/tests/generer_motifs.py pour ce logiciel (aucune image tierce).
 
 node_modules/@babel/code-frame

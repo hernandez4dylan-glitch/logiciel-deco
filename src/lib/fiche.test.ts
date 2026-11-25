@@ -3,7 +3,7 @@ import { ficheHtml } from "./fiche";
 
 const list = {
   items: [{ productId: "p", sku: "MOB-BOU-002", name: "Fauteuil <bouclette>", qty: 2, unit: 549, total: 1098 }],
-  finishes: [{ kind: "peinture" as const, name: "Beige mat", reference: "MAG-12", color: "#D8C7AE", zones: ["Mur du fond"] }],
+  finishes: [{ kind: "peinture" as const, name: "Beige mat", reference: "MAG-12", color: "#D8C7AE", marque: "Marque essai", aspect: "satin" as const, zones: ["Mur du fond"] }],
   subtotal: 1098,
   total: 988.2,
 };
@@ -15,6 +15,7 @@ describe("fiche client", () => {
     expect(html).toContain("Fauteuil &lt;bouclette&gt;");
     expect(html).not.toContain("<bouclette>");
     expect(html).toContain("MAG-12");
+    expect(html).toContain("Marque essai – Beige mat (#D8C7AE), satiné");
     expect(html).toContain("Mur du fond");
     expect(html).toContain("Remise 10 %");
     expect(html).toContain("Variante B");

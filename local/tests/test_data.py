@@ -93,8 +93,26 @@ class DataTests(unittest.TestCase):
         self.assertEqual(avant, [tuple(r) for r in old.execute('SELECT * FROM products ORDER BY id')])
         noms = {r[0] for r in old.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         self.assertTrue({'finishes', 'product_photos', 'projects', 'variants'} <= noms)
-        self.assertEqual(old.execute('SELECT count(*) FROM finishes').fetchone()[0], 7)
-        self.assertEqual(old.execute("SELECT count(*) FROM finishes WHERE kind='papier'").fetchone()[0], 1)
+        self.assertEqual(old.execute('SELECT count(*) FROM finishes').fetchone()[0], 8)
+        self.assertEqual(old.execute("SELECT count(*) FROM finishes WHERE kind='papier'").fetchone()[0], 2)
+        self.assertEqual(old.execute("SELECT count(*) FROM finishes WHERE usage='sol'").fetchone()[0], 1)
+        cols = {r[1] for r in old.execute('PRAGMA table_info(finishes)')}
+        self.assertTrue({'marque', 'gamme', 'usage', 'finition'} <= cols)
+
+    def test_migration_4_depuis_la_version_3(self):
+        # Base déjà en version 3 avec une teinte saisie : elle est conservée telle quelle.
+        db = sqlite3.connect(':memory:')
+        db.row_factory = sqlite3.Row
+        db.executescript((LOCAL / 'init.sql').read_text(encoding='utf-8'))
+        from data import MIGRATIONS
+        for n in (2, 3):
+            db.executescript(MIGRATIONS[n] + f'\nPRAGMA user_version={n};')
+        db.execute("INSERT INTO finishes (kind, name, reference, color, finition) VALUES ('peinture','Ma teinte','R-1','#112233','mat')")
+        db.commit()
+        avant = [tuple(r) for r in db.execute('SELECT * FROM finishes ORDER BY id')]
+        self.assertEqual(migrer(db), VERSION)
+        apres = [tuple(r)[:len(avant[0])] for r in db.execute('SELECT * FROM finishes WHERE reference != ? ORDER BY id', ('EX-SOL-CHENE',))]
+        self.assertEqual(avant, apres)
 
     def test_teintes_et_matieres(self):
         # Valeurs telles que les envoie le formulaire (motif vide, sans texture).
@@ -108,7 +126,15 @@ class DataTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.run_op(table='finishes', op='insert', values=bad)
         papiers = self.run_op(table='finishes', op='select', where={'kind': 'papier'})
-        self.assertEqual([p['texture_path'] for p in papiers], ['/images/motifs/feuillage.png'])
+        self.assertEqual(sorted(p['texture_path'] for p in papiers), ['/images/motifs/feuillage.png', '/images/motifs/parquet-chene.jpg'])
+        # Peinture d'un fournisseur : marque, gamme, finition, usage.
+        lg = self.run_op(table='finishes', op='insert', values={'kind': 'peinture', 'name': 'Teinte essai', 'reference': 'REF-1',
+                         'color': '#8A9A8C', 'finition': 'velours', 'marque': 'Marque essai', 'gamme': 'Intérieur', 'usage': 'porte'})
+        self.assertEqual((lg['marque'], lg['finition'], lg['usage']), ('Marque essai', 'velours', 'porte'))
+        for bad in ({'kind': 'peinture', 'name': 'x', 'finition': 'laquée'}, {'kind': 'peinture', 'name': 'x', 'usage': 'toit'},
+                    {'kind': 'peinture', 'name': 'x', 'marque': 'm' * 200}):
+            with self.assertRaises(ValueError):
+                self.run_op(table='finishes', op='insert', values=bad)
 
     def test_projets_et_variantes(self):
         p = self.run_op(table='projects', op='insert', values={'name': 'Salon Martin', 'client': 'M. Martin'})

@@ -26,6 +26,11 @@ Les clients de la boutique et ceux des décorateurs meublent leur intérieur ave
 - [x] Studio : articles ancrés au sol ou sur un meuble, échelle, miroir, ombre réglable, premier plan
 - [x] Studio : lumière des articles accordée à la pièce, ombre portée orientée, annuler / rétablir (Ctrl+Z / Ctrl+Y)
 - [x] Studio : projets clients enregistrés, variantes, comparaison, visuel PNG, fiche client, références CSV
+- [x] Studio : moteur de peinture physique (lumière, couleur de la lumière, grain) ; surfaces typées mur / plafond /
+  porte / cadre / sol ; « Séparer le cadre » ; finitions mat, velours, satiné, brillant avec reflets du sol
+- [x] Bibliothèque : teintes et matières comme des produits (marque, gamme, référence, finition, usage), recherche,
+  filtre par marque, import de nuancier fournisseur (CSV Excel) sans doublon
+- [ ] Nuanciers fournisseurs à saisir ou importer (références réelles, couleurs officielles, motifs des papiers)
 - [x] Outils sans crédits : tout fonctionne sur le PC, sans clé API ni coût par rendu
 - [ ] Rendu photoréaliste complet (rééclairage de toute la scène) : non réalisable en local à ce jour
 - [ ] Navigation dans une maquette 3D complète : à étudier ensuite

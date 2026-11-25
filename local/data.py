@@ -9,7 +9,7 @@ INSERT_FIELDS = {
     'suppliers': {'name','contact_name','email','phone','lead_time_days'},
     'expenses': {'label','category','amount','expense_date'},
     'decorators': {'name','company','email','phone','discount_percent'},
-    'finishes': {'kind','name','reference','color','texture_path','motif_cm','finition'},
+    'finishes': {'kind','name','reference','color','texture_path','motif_cm','finition','marque','gamme','usage'},
     'product_photos': {'product_id','image_path','cutout_path','label'},
     'projects': {'name','client','notes'},
     'variants': {'project_id','name','base_path','width','height','data'},
@@ -20,7 +20,7 @@ UPDATE_FIELDS = {
     'suppliers': {'name','contact_name','email','phone','lead_time_days'},
     'decorators': {'name','company','email','phone','discount_percent'},
     'sales': {'customer_name'},
-    'finishes': {'name','reference','color','texture_path','motif_cm','finition'},
+    'finishes': {'name','reference','color','texture_path','motif_cm','finition','marque','gamme','usage'},
     'product_photos': {'cutout_path','label'},
     'projects': {'name','client','notes'},
     'variants': {'name','data','base_path','width','height'},
@@ -32,6 +32,8 @@ BOOLEANS = ('is_pro','published_web')
 NUMBERS = ('purchase_price_ht','sale_price_ttc','pro_price_ttc','amount','stock','low_stock_threshold','lead_time_days','motif_cm','width','height')
 FACULTATIFS = {'motif_cm'}  # nombres qui peuvent rester vides
 FINITIONS = {'peinture','papier','enduit'}
+ASPECTS = {'mat','velours','satin','brillant'}  # finition d'une peinture
+USAGES = {'mur','plafond','porte','cadre','sol','autre'}
 TOUCH = {'projects','variants','finishes'}  # tables avec updated_at
 
 # Migrations additives : jamais de suppression ni de réécriture des données existantes.
@@ -88,6 +90,15 @@ INSERT INTO finishes (kind, name, reference, color, texture_path, motif_cm, fini
   ('papier', 'Feuillage sauge (exemple)', 'EX-PAP-FEUIL', NULL, '/images/motifs/feuillage.png', 53, 'intissé'),
   ('enduit', 'Enduit taloché lin (exemple)', 'EX-END-TALO', '#CDC0B0', '/images/motifs/enduit-taloche.jpg', NULL, 'mat');
 """,
+    # Teintes et matières comme des produits : marque (fournisseur), gamme, usage
+    # (mur, plafond, porte, cadre, sol). Colonnes ajoutées, lignes existantes intactes.
+    4: """
+ALTER TABLE finishes ADD COLUMN marque TEXT;
+ALTER TABLE finishes ADD COLUMN gamme TEXT;
+ALTER TABLE finishes ADD COLUMN usage TEXT;
+INSERT INTO finishes (kind, name, reference, color, texture_path, motif_cm, finition, usage) VALUES
+  ('papier', 'Parquet chêne clair (exemple)', 'EX-SOL-CHENE', NULL, '/images/motifs/parquet-chene.jpg', 140, 'satin', 'sol');
+""",
 }
 VERSION = max(MIGRATIONS)
 
@@ -117,6 +128,11 @@ def check(values):
     for field in ('name','label','sku'):
         if field in values and not str(values[field] or '').strip(): raise ValueError('Champ obligatoire vide')
     if 'kind' in values and values['kind'] not in FINITIONS: raise ValueError('Type de finition inconnu')
+    if values.get('kind') == 'peinture' and values.get('finition') not in (None, '') and values['finition'] not in ASPECTS:
+        raise ValueError('Finition de peinture inconnue (mat, velours, satin, brillant)')
+    if values.get('usage') not in (None, '') and values['usage'] not in USAGES: raise ValueError('Usage inconnu')
+    for field in ('marque', 'gamme', 'reference', 'name'):
+        if values.get(field) is not None and len(str(values[field])) > 120: raise ValueError('Texte trop long')
     if values.get('color') is not None and not re.fullmatch('#[0-9a-fA-F]{6}',str(values['color'])): raise ValueError('Couleur invalide')
     for field in ('texture_path','image_path','cutout_path','base_path'):
         if values.get(field) is not None and not re.fullmatch(r'(?:/images/(?:products|motifs)/)?[A-Za-z0-9_-]{1,110}\.(?:png|jpe?g|webp|gif|avif)',str(values[field]),re.I):

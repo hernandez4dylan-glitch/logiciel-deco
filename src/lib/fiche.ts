@@ -1,9 +1,9 @@
 import { eur } from "@/lib/format";
-import type { referenceList } from "@/lib/scene";
+import { finishLabel, type referenceList } from "@/lib/scene";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
-const KIND: Record<string, string> = { peinture: "Peinture", papier: "Papier peint", enduit: "Enduit / béton ciré" };
+const KIND: Record<string, string> = { peinture: "Peinture", papier: "Papier peint / revêtement", enduit: "Enduit / béton ciré" };
 
 /** Page HTML autonome de la proposition : visuel, articles retenus, finitions et totaux. */
 export function ficheHtml(o: {
@@ -23,7 +23,7 @@ export function ficheHtml(o: {
   const fin = o.list.finishes
     .map(
       (f) =>
-        `<tr><td>${esc(f.reference ?? "—")}</td><td>${f.color ? `<span class="sw" style="background:${esc(f.color)}"></span>` : ""}${esc(KIND[f.kind] ?? f.kind)} · ${esc(f.name)}${f.color ? ` (${esc(f.color)})` : ""}</td><td>${esc(f.zones.join(", "))}</td></tr>`,
+        `<tr><td>${esc(f.reference ?? "—")}</td><td>${f.color ? `<span class="sw" style="background:${esc(f.color)}"></span>` : ""}${esc(KIND[f.kind] ?? f.kind)} · ${esc(finishLabel(f))}</td><td>${esc(f.zones.join(", "))}</td></tr>`,
     )
     .join("");
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${esc(o.projet)} — ${esc(o.variante)}</title><style>

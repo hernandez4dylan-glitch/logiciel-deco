@@ -1,15 +1,21 @@
-import { useState } from "react";
-import { Eye, EyeOff, Grid2x2, Pencil, Pipette, Plus, ScanLine, ShieldMinus, Sparkles, Trash2, Undo2, Wand2, Paintbrush } from "lucide-react";
+import { useMemo, useState } from "react";
+import { DoorOpen, Eye, EyeOff, Grid2x2, Pencil, Pipette, Plus, ScanLine, Search, ShieldMinus, Sparkles, SquareSplitHorizontal, Trash2, Undo2, Wand2, Paintbrush } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { photoUrl } from "@/lib/studio-api";
+import { ASPECTS, SURFACES, aspectLabel, isAspect, surfaceLabel, zoneAspect, type Surface } from "@/lib/scene";
 import { FinishDialog, KIND_LABEL } from "@/components/studio/finish-dialog";
+import { FinishImport } from "@/components/studio/finish-import";
 import type { WorkspaceApi } from "@/components/studio/workspace";
 import type { StageTool } from "@/components/studio/stage";
 
 const KINDS = ["peinture", "papier", "enduit"] as const;
+const TAB_LABEL: Record<(typeof KINDS)[number], string> = { peinture: "Peintures", papier: "Papiers & sols", enduit: "Enduits" };
+const AJOUTS: Surface[] = ["mur", "plafond", "porte", "sol", "autre"];
+const TOUTES = "toutes";
 
 function Swatch({ color, texture, className }: { color: string | null; texture: string | null; className?: string }) {
   return texture ? (
@@ -19,27 +25,49 @@ function Swatch({ color, texture, className }: { color: string | null; texture: 
   );
 }
 
+const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
 export function PanelMurs({ api }: { api: WorkspaceApi }) {
   const [kind, setKind] = useState<(typeof KINDS)[number]>("peinture");
+  const [recherche, setRecherche] = useState("");
+  const [marque, setMarque] = useState(TOUTES);
+  const [epaisseur, setEpaisseur] = useState(0.8);
   const z = api.activeZone;
   const tools: { id: StageTool; label: string; icon: typeof Wand2; hint: string }[] = [
-    { id: "mur-clic", label: "Baguette", icon: Wand2, hint: "Cliquez sur le mur : sélection automatique jusqu'aux arêtes et menuiseries" },
-    { id: "mur-plus", label: "Ajouter", icon: Paintbrush, hint: "Pinceau : ajoute au mur" },
-    { id: "mur-moins", label: "Protéger", icon: ShieldMinus, hint: "Pinceau : retire et protège (fenêtre, plinthe, meuble devant le mur)" },
+    { id: "mur-clic", label: "Baguette", icon: Wand2, hint: "Cliquez sur la surface : sélection automatique jusqu'aux arêtes et menuiseries" },
+    { id: "mur-plus", label: "Ajouter", icon: Paintbrush, hint: "Pinceau : ajoute à la surface" },
+    { id: "mur-moins", label: "Protéger", icon: ShieldMinus, hint: "Pinceau : retire et protège (fenêtre, plinthe, meuble devant)" },
   ];
-  const list = api.finishes.filter((f) => f.kind === kind);
+  const marques = useMemo(
+    () => [...new Set(api.finishes.map((f) => f.marque?.trim()).filter((m): m is string => !!m))].sort((a, b) => a.localeCompare(b, "fr")),
+    [api.finishes],
+  );
+  const list = useMemo(() => {
+    const q = norm(recherche.trim());
+    return api.finishes
+      .filter((f) => f.kind === kind)
+      .filter((f) => marque === TOUTES || (f.marque ?? "") === marque)
+      .filter((f) => !q || norm([f.name, f.reference, f.marque, f.gamme, f.color].filter(Boolean).join(" ")).includes(q))
+      // Les teintes prévues pour la surface en cours d'abord (peinture de porte pour une porte…).
+      .sort((a, b) => Number(b.usage === z?.surface) - Number(a.usage === z?.surface));
+  }, [api.finishes, kind, marque, recherche, z?.surface]);
+  const aspect = z ? zoneAspect(z) : null;
 
   return (
     <div className="grid gap-4 text-sm">
       <section className="grid gap-2">
-        <div className="flex items-center justify-between">
-          <h3 className="font-medium">Surfaces</h3>
-          <Button size="sm" variant="outline" onClick={api.addZone}>
-            <Plus className="h-4 w-4" /> Nouveau mur
-          </Button>
+        <h3 className="font-medium">Surfaces</h3>
+        <div className="flex flex-wrap gap-1">
+          {AJOUTS.map((s) => (
+            <Button key={s} size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => api.addZone(s)} title={`Nouvelle surface : ${surfaceLabel(s).toLowerCase()}`}>
+              <Plus className="h-3.5 w-3.5" /> {surfaceLabel(s).split(" ")[0]}
+            </Button>
+          ))}
         </div>
         {api.scene.zones.length === 0 && (
-          <p className="text-xs text-muted-foreground">Créez un mur, cliquez dessus avec la baguette, puis choisissez une teinte dans la bibliothèque.</p>
+          <p className="text-xs text-muted-foreground">
+            Créez une surface (mur, plafond, porte, sol), cliquez dessus avec la baguette, puis choisissez une teinte dans la bibliothèque.
+          </p>
         )}
         <ul className="grid gap-1">
           {api.scene.zones.map((zone) => (
@@ -52,7 +80,10 @@ export function PanelMurs({ api }: { api: WorkspaceApi }) {
                 <span className="min-w-0">
                   <span className="block truncate font-medium">{zone.name}</span>
                   <span className="block truncate text-xs text-muted-foreground">
-                    {zone.finish ? `${zone.finish.name}${zone.finish.reference ? ` · ${zone.finish.reference}` : ""}` : "Sans finition"}
+                    {surfaceLabel(zone.surface).split(" ")[0]} ·{" "}
+                    {zone.finish
+                      ? `${[zone.finish.marque, zone.finish.name].filter(Boolean).join(" – ")} · ${aspectLabel(zoneAspect(zone)).toLowerCase()}`
+                      : "sans finition"}
                   </span>
                 </span>
               </button>
@@ -69,8 +100,16 @@ export function PanelMurs({ api }: { api: WorkspaceApi }) {
 
       {z && (
         <section className="grid gap-2 rounded-lg border p-2">
-          <Input aria-label="Nom de la surface" value={z.name} onChange={(e) => api.updateZone(z.id, { name: e.target.value })} className="h-8" />
-          <p className="text-xs font-medium text-muted-foreground">Sélection du mur</p>
+          <div className="grid grid-cols-[1fr_auto] gap-1">
+            <Input aria-label="Nom de la surface" value={z.name} onChange={(e) => api.updateZone(z.id, { name: e.target.value })} className="h-8" />
+            <Select value={z.surface} onValueChange={(v) => api.updateZone(z.id, { surface: v as Surface })}>
+              <SelectTrigger className="h-8 w-[150px]" aria-label="Type de surface"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {SURFACES.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-xs font-medium text-muted-foreground">Sélection</p>
           <div className="grid grid-cols-3 gap-1">
             {tools.map((t) => (
               <Button key={t.id} size="sm" variant={api.tool === t.id ? "default" : "outline"} title={t.hint} aria-pressed={api.tool === t.id} onClick={() => api.setTool(t.id)} className="px-1">
@@ -95,7 +134,7 @@ export function PanelMurs({ api }: { api: WorkspaceApi }) {
               size="sm"
               variant={api.tool === "pipette" ? "default" : "outline"}
               aria-pressed={api.tool === "pipette"}
-              title="Prélever une teinte sur la photo (coussin, tissu, échantillon) et l'appliquer à ce mur"
+              title="Prélever une teinte sur la photo (coussin, tissu, échantillon) et l'appliquer à cette surface"
               onClick={() => api.setTool(api.tool === "pipette" ? "deplacer" : "pipette")}
             >
               <Pipette className="h-4 w-4" /> Pipette
@@ -110,9 +149,28 @@ export function PanelMurs({ api }: { api: WorkspaceApi }) {
               Tout désélectionner
             </Button>
           </div>
+          {z.surface === "porte" && (
+            <div className="grid gap-1 rounded-md bg-muted/50 p-2">
+              <p className="flex items-center gap-1 text-xs font-medium">
+                <DoorOpen className="h-3.5 w-3.5" /> Porte et cadre
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Sélectionnez la porte avec son huisserie, puis séparez le cadre pour lui donner sa propre teinte (cadre blanc satiné, porte colorée…).
+              </p>
+              <label className="grid gap-1 text-xs text-muted-foreground">
+                Largeur du cadre : {Math.max(2, Math.round((epaisseur / 100) * api.W))} px
+                <Slider min={0.2} max={3} step={0.1} value={[epaisseur]} onValueChange={([v]) => setEpaisseur(v ?? 0.8)} aria-label="Largeur du cadre" />
+              </label>
+              <Button size="sm" variant="outline" disabled={!!api.busy} onClick={() => void api.splitFrame(Math.max(2, Math.round((epaisseur / 100) * api.W)))}>
+                <SquareSplitHorizontal className="h-4 w-4" /> Séparer le cadre
+              </Button>
+            </div>
+          )}
           {z.finish && !z.finish.id && z.finish.color && (
             <FinishDialog
               initialColor={z.finish.color}
+              defaultUsage={z.surface}
+              marques={marques}
               onSaved={(f) => api.applyFinish(f)}
               trigger={
                 <Button size="sm" variant="hero">
@@ -123,7 +181,30 @@ export function PanelMurs({ api }: { api: WorkspaceApi }) {
           )}
           {z.finish && (
             <>
-              <p className="mt-1 text-xs font-medium text-muted-foreground">Rendu</p>
+              <p className="mt-1 text-xs font-medium text-muted-foreground">Finition</p>
+              <div className="grid grid-cols-4 gap-1" role="radiogroup" aria-label="Finition">
+                {ASPECTS.map((a) => (
+                  <Button
+                    key={a.id}
+                    size="sm"
+                    role="radio"
+                    aria-checked={aspect === a.id}
+                    variant={aspect === a.id ? "default" : "outline"}
+                    className="px-1 text-xs"
+                    onClick={() => api.updateZone(z.id, { aspect: a.id })}
+                  >
+                    {a.label}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {z.aspect
+                  ? "Choisie pour cette surface."
+                  : z.finish.kind === "peinture" && isAspect(z.finish.finition)
+                    ? "Celle de la fiche de la teinte."
+                    : `Habituelle pour : ${surfaceLabel(z.surface).toLowerCase()}.`}{" "}
+                Mat absorbe la lumière ; velours, satiné puis brillant reflètent de plus en plus le sol et la lumière.
+              </p>
               <label className="grid gap-1 text-xs text-muted-foreground">
                 Lumière de la pièce conservée : {Math.round(z.lumiere * 100)} %
                 <Slider min={0.5} max={1.5} step={0.05} value={[z.lumiere]} onValueChange={([v]) => api.updateZone(z.id, { lumiere: v ?? 1 })} aria-label="Lumière conservée" />
@@ -145,17 +226,22 @@ export function PanelMurs({ api }: { api: WorkspaceApi }) {
       )}
 
       <section className="grid gap-2">
-        <div className="flex items-center justify-between">
-          <h3 className="font-medium">Bibliothèque du magasin</h3>
-          <FinishDialog
-            defaultKind={kind}
-            trigger={
-              <Button size="sm" variant="outline">
-                <Plus className="h-4 w-4" /> Ajouter
-              </Button>
-            }
-            onSaved={(f) => api.activeZone && !api.activeZone.finish && api.applyFinish(f)}
-          />
+        <div className="flex items-center justify-between gap-1">
+          <h3 className="font-medium">Bibliothèque</h3>
+          <div className="flex gap-1">
+            <FinishImport finishes={api.finishes} />
+            <FinishDialog
+              defaultKind={kind}
+              defaultUsage={kind === "papier" && z?.surface === "sol" ? "sol" : null}
+              marques={marques}
+              trigger={
+                <Button size="sm" variant="outline">
+                  <Plus className="h-4 w-4" /> Ajouter
+                </Button>
+              }
+              onSaved={(f) => api.activeZone && !api.activeZone.finish && api.applyFinish(f)}
+            />
+          </div>
         </div>
         <div className="flex rounded-md border p-0.5" role="tablist" aria-label="Type de finition">
           {KINDS.map((k) => (
@@ -167,32 +253,57 @@ export function PanelMurs({ api }: { api: WorkspaceApi }) {
               onClick={() => setKind(k)}
               className={cn("flex-1 rounded px-1 py-1 text-xs", kind === k ? "bg-primary text-primary-foreground" : "hover:bg-muted")}
             >
-              {k === "peinture" ? "Peintures" : k === "papier" ? "Papiers peints" : "Enduits"}
+              {TAB_LABEL[k]}
             </button>
           ))}
         </div>
-        {list.length === 0 && <p className="text-xs text-muted-foreground">Aucun {KIND_LABEL[kind].toLowerCase()} enregistré.</p>}
+        <div className="grid grid-cols-[1fr_auto] gap-1">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
+            <Input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Nom, référence, couleur" aria-label="Rechercher une teinte" className="h-8 pl-7" />
+          </div>
+          <Select value={marque} onValueChange={setMarque}>
+            <SelectTrigger className="h-8 w-[130px]" aria-label="Marque"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={TOUTES}>Toutes marques</SelectItem>
+              {marques.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        {list.length === 0 && (
+          <p className="text-xs text-muted-foreground">
+            {recherche || marque !== TOUTES ? "Aucune teinte ne correspond." : `Aucun ${KIND_LABEL[kind].toLowerCase()} enregistré.`}
+          </p>
+        )}
         <ul className="grid max-h-72 gap-1 overflow-auto pr-1">
           {list.map((f) => {
             const active = z?.finish?.id === f.id;
+            const conseil = f.usage && f.usage === z?.surface;
             return (
               <li key={f.id} className={cn("group flex items-center gap-2 rounded-md border p-1.5", active && "border-primary ring-1 ring-primary")}>
                 <button
                   type="button"
                   className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                  title={z ? `Appliquer sur « ${z.name} »` : "Sélectionnez d'abord un mur"}
+                  title={z ? `Appliquer sur « ${z.name} »` : "Sélectionnez d'abord une surface"}
                   onClick={() => api.applyFinish(f)}
                 >
                   <Swatch color={f.color} texture={f.texture_path} className="h-7 w-7 shrink-0" />
                   <span className="min-w-0">
-                    <span className="block truncate font-medium">{f.name}</span>
+                    <span className="block truncate font-medium">
+                      {f.marque ? <span className="text-muted-foreground">{f.marque} – </span> : null}
+                      {f.name}
+                    </span>
                     <span className="block truncate text-xs text-muted-foreground">
-                      {[f.reference, f.color, f.finition].filter(Boolean).join(" · ") || KIND_LABEL[f.kind]}
+                      {[f.reference, f.gamme, f.color, isAspect(f.finition) ? aspectLabel(f.finition) : f.finition, f.usage ? surfaceLabel(f.usage).split(" ")[0] : null]
+                        .filter(Boolean)
+                        .join(" · ") || KIND_LABEL[f.kind]}
                     </span>
                   </span>
                 </button>
+                {conseil && <span className="rounded bg-primary/10 px-1 text-[10px] text-primary">conseillé</span>}
                 <FinishDialog
                   finish={f}
+                  marques={marques}
                   trigger={
                     <Button size="icon" variant="ghost" className="h-7 w-7 opacity-60 group-hover:opacity-100" aria-label={`Modifier ${f.name}`}>
                       <Pencil className="h-3.5 w-3.5" />
@@ -205,7 +316,7 @@ export function PanelMurs({ api }: { api: WorkspaceApi }) {
         </ul>
         {z && (
           <p className="flex items-center gap-1 text-xs text-muted-foreground">
-            <ScanLine className="h-3 w-3" /> Un clic sur une finition l'applique à « {z.name} » ; les articles restent à leur place.
+            <ScanLine className="h-3 w-3" /> Un clic sur une teinte l'applique à « {z.name} » ; les articles restent à leur place.
           </p>
         )}
       </section>

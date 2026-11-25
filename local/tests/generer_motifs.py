@@ -43,7 +43,36 @@ def enduit(n=600):
     return np.clip(base * (1 + v[:, :, None]), 0, 255).astype(np.uint8)
 
 
+def parquet(n=1024, lames=8):
+    """Parquet chêne clair à l'anglaise, vu de dessus (raccord droit) : lames longues,
+    fil du bois étiré, nuances d'une lame à l'autre, joints fins."""
+    rng = np.random.default_rng(21)
+    h_lame = n // lames
+    img = np.zeros((h_lame * lames, n, 3), np.float32)
+    yy, xx = np.mgrid[0:h_lame, 0:n].astype(np.float32)
+    for r in range(lames):
+        decal = rng.uniform(0, n)
+        longueur = n / rng.choice([1.0, 1.5, 2.0])
+        for k in range(-1, 4):
+            x0 = (decal + k * longueur) % n
+            ton = rng.uniform(0.86, 1.08)
+            teinte = np.array([120, 160, 198], np.float32) * ton  # chêne clair (BGR)
+            fil = cv2.GaussianBlur(rng.standard_normal((h_lame, n)).astype(np.float32), (0, 0), sigmaX=45, sigmaY=1.2)
+            fin = cv2.GaussianBlur(rng.standard_normal((h_lame, n)).astype(np.float32), (0, 0), sigmaX=8, sigmaY=0.6)
+            ondule = np.sin((yy / h_lame * 2.2 + np.sin(xx / rng.uniform(180, 320) + rng.uniform(0, 6)) * 0.35) * np.pi)
+            fil = fil / (fil.std() + 1e-6)
+            fin = fin / (fin.std() + 1e-6)
+            planche = teinte[None, None, :] * (1 + 0.035 * fil[..., None] + 0.02 * fin[..., None] + 0.015 * ondule[..., None])
+            sel = ((xx - x0) % n) < longueur
+            bloc = img[r * h_lame:(r + 1) * h_lame]
+            bloc[sel] = planche[sel]
+            bloc[np.abs((xx - x0) % n) < 1.2] *= 0.78  # joint de bout
+        img[r * h_lame:r * h_lame + 1] *= 0.75  # joint de rive
+    return np.clip(img, 0, 255).astype(np.uint8)
+
+
 if __name__ == '__main__':
+    cv2.imwrite(str(OUT / 'parquet-chene.jpg'), parquet(), [cv2.IMWRITE_JPEG_QUALITY, 90])
     cv2.imwrite(str(OUT / 'feuillage.png'), feuillage())
     cv2.imwrite(str(OUT / 'enduit-taloche.jpg'), enduit(), [cv2.IMWRITE_JPEG_QUALITY, 90])
     print('Motifs écrits dans', OUT)

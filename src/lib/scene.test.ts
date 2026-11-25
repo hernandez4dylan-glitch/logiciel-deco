@@ -16,6 +16,8 @@ import {
   zoomAt,
   type Item,
   type Scene,
+  zoneAspect,
+  type FinishSnapshot,
 } from "./scene";
 
 const item = (p: Partial<Item> = {}): Item => ({
@@ -88,11 +90,13 @@ describe("composition enregistrée", () => {
           id: "z1",
           name: "Mur du fond",
           mask: "masque-1.png",
-          finish: { id: "f1", kind: "peinture", name: "Beige mat", reference: "MAG-12", color: "#D8C7AE", texture: null },
+          finish: { id: "f1", kind: "peinture", name: "Beige mat", reference: "MAG-12", color: "#D8C7AE", texture: null, marque: "Marque essai", gamme: null, finition: "velours" },
           quad: null,
           repetitions: 4,
           lumiere: 1,
           visible: true,
+          surface: "porte",
+          aspect: "brillant",
         },
       ],
     };
@@ -102,6 +106,7 @@ describe("composition enregistrée", () => {
     expect(vieux.items[0]!.x).toBe(1.5);
     expect(vieux.items[0]!.shadow.opacity).toBeGreaterThan(0);
     expect(vieux.zones[0]!.finish).toBeNull();
+    expect(vieux.zones[0]).toMatchObject({ surface: "mur", aspect: null });
   });
   it("duplique une variante sans lien avec l'originale", () => {
     const s: Scene = { ...newScene(), items: [item()] };
@@ -115,15 +120,29 @@ describe("composition enregistrée", () => {
   });
 });
 
+const beige: FinishSnapshot = { id: "f", kind: "peinture", name: "Beige mat", reference: "MAG-12", color: "#D8C7AE", texture: null, marque: "Marque essai", gamme: null, finition: "mat" };
+
+describe("finition rendue d'une zone", () => {
+  it("choix de la zone, sinon fiche de la teinte, sinon habitude de la surface", () => {
+    expect(zoneAspect({ aspect: "brillant", finish: beige, surface: "mur" })).toBe("brillant");
+    expect(zoneAspect({ aspect: null, finish: beige, surface: "porte" })).toBe("mat");
+    expect(zoneAspect({ aspect: null, finish: { ...beige, finition: null }, surface: "porte" })).toBe("satin");
+    expect(zoneAspect({ aspect: null, finish: { ...beige, kind: "papier", finition: "intissé" }, surface: "sol" })).toBe("satin");
+    expect(zoneAspect({ aspect: null, finish: null, surface: "plafond" })).toBe("mat");
+  });
+});
+
 describe("références et quantités", () => {
   it("compte les articles et liste les finitions avec leur référence", () => {
     const s: Scene = {
       ...newScene(),
       items: [item({ uid: "1" }), item({ uid: "2" }), item({ uid: "3", productId: "p2" }), item({ uid: "4", productId: "inconnu" })],
       zones: [
-        { id: "z1", name: "Mur du fond", mask: "m1.png", finish: { id: "f", kind: "peinture", name: "Beige mat", reference: "MAG-12", color: "#D8C7AE", texture: null }, quad: null, repetitions: 4, lumiere: 1, visible: true },
-        { id: "z2", name: "Mur gauche", mask: "m2.png", finish: { id: "f", kind: "peinture", name: "Beige mat", reference: "MAG-12", color: "#D8C7AE", texture: null }, quad: null, repetitions: 4, lumiere: 1, visible: true },
-        { id: "z3", name: "Brouillon", mask: null, finish: { id: "g", kind: "papier", name: "Motif", reference: "PP-1", color: null, texture: "t.png" }, quad: null, repetitions: 4, lumiere: 1, visible: true },
+        { id: "z1", name: "Mur du fond", mask: "m1.png", finish: beige, quad: null, repetitions: 4, lumiere: 1, visible: true, surface: "mur", aspect: null },
+        { id: "z2", name: "Mur gauche", mask: "m2.png", finish: beige, quad: null, repetitions: 4, lumiere: 1, visible: true, surface: "mur", aspect: null },
+        { id: "z3", name: "Brouillon", mask: null, finish: { ...beige, id: "g", kind: "papier", name: "Motif", reference: "PP-1", color: null, texture: "t.png" }, quad: null, repetitions: 4, lumiere: 1, visible: true, surface: "mur", aspect: null },
+        // Même teinte sur une porte : finition satinée par défaut, donc ligne séparée.
+        { id: "z4", name: "Porte", mask: "m4.png", finish: { ...beige, finition: null }, quad: null, repetitions: 4, lumiere: 1, visible: true, surface: "porte", aspect: null },
       ],
     };
     const list = referenceList(s, products, { pro: true, discount: 10 });
@@ -133,10 +152,13 @@ describe("références et quantités", () => {
     ]);
     expect(list.subtotal).toBe(987);
     expect(list.total).toBe(888.3);
-    expect(list.finishes).toEqual([{ kind: "peinture", name: "Beige mat", reference: "MAG-12", color: "#D8C7AE", zones: ["Mur du fond", "Mur gauche"] }]);
+    expect(list.finishes).toEqual([
+      { kind: "peinture", name: "Beige mat", reference: "MAG-12", color: "#D8C7AE", marque: "Marque essai", aspect: "mat", zones: ["Mur du fond", "Mur gauche"] },
+      { kind: "peinture", name: "Beige mat", reference: "MAG-12", color: "#D8C7AE", marque: "Marque essai", aspect: "satin", zones: ["Porte"] },
+    ]);
     const rows = referenceRows(list);
-    expect(rows).toHaveLength(3);
-    expect(rows[2]).toMatchObject({ Type: "Peinture", Référence: "MAG-12", Quantité: 2 });
+    expect(rows).toHaveLength(4);
+    expect(rows[2]).toMatchObject({ Type: "Peinture", Référence: "Marque essai · MAG-12", Désignation: "Marque essai – Beige mat (#D8C7AE), mat", Quantité: 2 });
     expect(referenceList(s, products, { pro: false, discount: 0 }).items[1]!.unit).toBe(59);
   });
 });

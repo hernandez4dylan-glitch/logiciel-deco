@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { eur } from "@/lib/format";
-import { referenceList } from "@/lib/scene";
+import { referenceList, finishLabel } from "@/lib/scene";
 import { cn } from "@/lib/utils";
 import type { WorkspaceApi } from "@/components/studio/workspace";
 
@@ -57,11 +57,11 @@ export function PanelReferences({ api, discount }: { api: WorkspaceApi; discount
         <div className="grid gap-1 border-t pt-2">
           <p className="font-medium">Finitions</p>
           {list.finishes.map((f) => (
-            <p key={`${f.kind}${f.reference}${f.name}`} className="flex items-center gap-2 text-xs">
+            <p key={`${f.kind}${f.marque}${f.reference}${f.name}${f.aspect}`} className="flex items-center gap-2 text-xs">
               {f.color && <span className="h-3 w-3 shrink-0 rounded-full border" style={{ backgroundColor: f.color }} />}
               <span className="min-w-0">
-                <span className="font-medium">{f.name}</span>
-                {f.reference ? ` · ${f.reference}` : ""} — {f.zones.join(", ")}
+                <span className="font-medium">{finishLabel(f)}</span>
+                {f.reference ? ` · réf. ${f.reference}` : ""} — {f.zones.join(", ")}
               </span>
             </p>
           ))}

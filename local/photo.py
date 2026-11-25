@@ -8,7 +8,7 @@ import numpy as np
 from gomme import remplir
 from retouche import changer_decor, couvrir, decor_genere, hex_bgr, isoler
 from detourage import detourer, sur_fond
-from finitions import affiner, appliquer, selectionner
+from finitions import BRILLANCE, FINITION_SURFACE, affiner, appliquer, selectionner, separer_cadre
 
 cv2.setNumThreads(2)
 network=None
@@ -123,11 +123,22 @@ def render(p):
         result=np.round(selectionner(rgb,plus,moins,float(np.clip(tol,.3,3)))*255).astype(np.uint8)
     elif mode=='affiner':
         result=np.round(affiner(rgb,masque(p,'mask',img))*255).astype(np.uint8)
+    elif mode=='cadre':
+        # Sépare une porte sélectionnée avec son huisserie : 'partie' = 'cadre' ou 'porte'.
+        try: ep=float(p.get('epaisseur') or 12)
+        except (TypeError,ValueError): raise ValueError('Épaisseur invalide')
+        feuille,cadre=separer_cadre(masque(p,'mask',img),float(np.clip(ep,2,80)))
+        if p.get('partie') not in ('cadre','porte'): raise ValueError('Partie inconnue')
+        result=np.round((cadre if p.get('partie')=='cadre' else feuille)*255).astype(np.uint8)
     elif mode=='finish':
         zones=[]
         for z in p.get('zones') or []:
             kind=z.get('type')
-            if kind not in ('peinture','papier','enduit'): raise ValueError('Finition inconnue')
+            if kind not in ('peinture','papier','enduit','sol'): raise ValueError('Finition inconnue')
+            surface=z.get('surface') or 'mur'
+            if surface not in FINITION_SURFACE: raise ValueError('Surface inconnue')
+            finition=z.get('finition') or None
+            if finition is not None and finition not in BRILLANCE: raise ValueError('Finition inconnue')
             color=z.get('couleur')
             if color is not None and not re.fullmatch('#[a-fA-F0-9]{6}',color): raise ValueError('Couleur invalide')
             if kind=='peinture' and color is None: raise ValueError('Choisissez une teinte')
@@ -138,7 +149,8 @@ def render(p):
             zones.append({'masque':masque(z,'mask',img),'type':kind,'couleur':color,
                           'texture':decode(z['texture'])[:,:,:3] if z.get('texture') else None,
                           'quad':quad,'repetitions':float(z.get('repetitions') or 4),
-                          'intensite_lumiere':float(np.clip(float(z.get('lumiere') or 1),0,2))})
+                          'intensite_lumiere':float(np.clip(float(z.get('lumiere') or 1),0,2)),
+                          'finition':finition,'surface':surface})
         result=appliquer(rgb,zones)
     else: raise ValueError('Retouche inconnue')
     ok,encoded=cv2.imencode('.png',result)

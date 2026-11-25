@@ -15,7 +15,7 @@ import type { StudioRows } from "@/lib/records";
 import { cutByMask, maskBounds, maskFromImage, newCanvas, strokeMask, tinted } from "@/lib/mask-canvas";
 import type { ItemAsset } from "@/lib/render-scene";
 import { finishPayload, itemImagePath, loadAsset, renderFinished } from "@/lib/compose";
-import { defaultQuad, itemBox, parseScene, popHistory, pushHistory, serializeScene, type CastShadow, type Item, type Point, type Quad, type Scene, type Zone } from "@/lib/scene";
+import { defaultQuad, floorQuad, itemBox, surfaceLabel, parseScene, popHistory, pushHistory, serializeScene, type CastShadow, type Item, type Point, type Quad, type Scene, type Surface, type Zone } from "@/lib/scene";
 import { accordLight, stats as lumStats, UndoStack } from "@/lib/lumiere";
 import { sampleColor } from "@/lib/couleur";
 import { canvasToBlob, canvasToDataUrl, loadImage, pathToDataUrl, photoEngine, photoUrl, uploadBlob } from "@/lib/studio-api";
@@ -42,7 +42,9 @@ export type WorkspaceApi = {
   // murs
   activeZone: Zone | null;
   setActiveZone: (id: string | null) => void;
-  addZone: () => void;
+  addZone: (surface?: Surface) => void;
+  /** Porte sélectionnée avec son huisserie : sépare le cadre dans une nouvelle surface. */
+  splitFrame: (epaisseur: number) => Promise<void>;
   updateZone: (id: string, patch: Partial<Zone>) => void;
   removeZone: (id: string) => void;
   applyFinish: (f: Finish) => void;
@@ -284,7 +286,7 @@ export function Workspace({
       JSON.stringify([
         basePath,
         commitTick,
-        scene.zones.map((z) => [z.id, z.finish, z.quad, z.repetitions, z.lumiere, z.visible, commits.current.get(z.id) ?? 0]),
+        scene.zones.map((z) => [z.id, z.finish, z.quad, z.repetitions, z.lumiere, z.visible, z.surface, z.aspect, commits.current.get(z.id) ?? 0]),
       ]),
     [scene.zones, basePath, commitTick],
   );
@@ -424,7 +426,9 @@ export function Workspace({
         toast.info(`Teinte prélevée ${hex} : créez ou choisissez un mur pour l'appliquer`);
         return;
       }
-      api.updateZone(zone.id, { finish: { id: null, kind: "peinture", name: `Teinte prélevée ${hex}`, reference: null, color: hex, texture: null } });
+      api.updateZone(zone.id, {
+        finish: { id: null, kind: "peinture", name: `Teinte prélevée ${hex}`, reference: null, color: hex, texture: null, marque: null, gamme: null, finition: null },
+      });
       toast.success(`Teinte ${hex} appliquée sur « ${zone.name} » — enregistrez-la dans la bibliothèque pour lui donner une référence`);
     } else if (tool === "poser" && selectedUid) {
       // La base de l'article (pieds, socle) vient se poser exactement sur le point cliqué.
@@ -480,13 +484,14 @@ export function Workspace({
     busy,
     activeZone,
     setActiveZone: setActiveZoneId,
-    addZone: () => {
+    addZone: (surface = "mur") => {
       const id = crypto.randomUUID();
       masks.current.set(id, newCanvas(W, H));
-      setScene((s) => ({
-        ...s,
-        zones: [...s.zones, { id, name: `Mur ${s.zones.length + 1}`, mask: null, finish: null, quad: null, repetitions: 4, lumiere: 1, visible: true }],
-      }));
+      setScene((s) => {
+        const n = s.zones.filter((z) => z.surface === surface).length + 1;
+        const zone: Zone = { id, name: `${surfaceLabel(surface).split(" ")[0]} ${n}`, mask: null, finish: null, quad: null, repetitions: 4, lumiere: 1, visible: true, surface, aspect: null };
+        return { ...s, zones: [...s.zones, zone] };
+      });
       setActiveZoneId(id);
       setTool("mur-clic");
     },
@@ -504,14 +509,76 @@ export function Workspace({
       const m = masks.current.get(activeZone.id);
       const b = m ? maskBounds(m) : null;
       if (!b) toast.info("Le mur n'est pas encore sélectionné : cliquez dessus avec la baguette");
-      const quad = activeZone.quad ?? (f.kind !== "peinture" && b ? defaultQuad({ x0: b.x0 / W, y0: b.y0 / H, x1: b.x1 / W, y1: b.y1 / H }) : null);
+      const boite = b ? { x0: b.x0 / W, y0: b.y0 / H, x1: b.x1 / W, y1: b.y1 / H } : null;
+      // Un sol fuit vers le fond : trapèze de départ (bord du fond plus étroit), à ajuster par les 4 coins.
+      const quad =
+        activeZone.quad ??
+        (f.kind !== "peinture" && boite ? (activeZone.surface === "sol" ? floorQuad(boite) : defaultQuad(boite)) : null);
       const changeKind = activeZone.finish?.kind !== f.kind;
       api.updateZone(activeZone.id, {
-        finish: { id: f.id, kind: f.kind, name: f.name, reference: f.reference, color: f.color, texture: f.texture_path },
+        finish: {
+          id: f.id,
+          kind: f.kind,
+          name: f.name,
+          reference: f.reference,
+          color: f.color,
+          texture: f.texture_path,
+          marque: f.marque ?? null,
+          gamme: f.gamme ?? null,
+          finition: f.finition,
+        },
+        // La finition de la fiche s'applique (une porte « satiné » du nuancier) ; on peut ensuite la changer.
+        aspect: null,
         quad,
         // Échelle de départ adaptée : un enduit se lit en grandes plages, un papier en motifs.
         ...(changeKind ? { repetitions: f.kind === "enduit" ? 1.5 : 4 } : {}),
       });
+      // On quitte la sélection pour voir le rendu sans la surbrillance verte.
+      if (tool === "mur-clic" || tool === "mur-plus" || tool === "mur-moins") setTool("deplacer");
+    },
+    splitFrame: async (epaisseur) => {
+      const zone = activeZone;
+      if (!zone) return;
+      const m = masks.current.get(zone.id);
+      if (!m || !maskBounds(m)) {
+        toast.info("Sélectionnez d'abord la porte avec son cadre");
+        return;
+      }
+      setBusy("Séparation du cadre…");
+      try {
+        const image = await pathToDataUrl(basePathRef.current);
+        const mask = await canvasToDataUrl(m);
+        const part = async (partie: "cadre" | "porte") =>
+          maskFromImage(await loadImage(URL.createObjectURL(await photoEngine({ image, mode: "cadre", mask, epaisseur, partie }))), W, H, true);
+        const [cadre, feuille] = [await part("cadre"), await part("porte")];
+        pushUndo(zone.id);
+        const ctx = m.getContext("2d")!;
+        ctx.clearRect(0, 0, W, H);
+        ctx.drawImage(feuille, 0, 0);
+        const id = crypto.randomUUID();
+        const cm = newCanvas(W, H);
+        cm.getContext("2d")!.drawImage(cadre, 0, 0);
+        masks.current.set(id, cm);
+        for (const k of [zone.id, id]) {
+          commits.current.set(k, (commits.current.get(k) ?? 0) + 1);
+          dirtyMasks.current.add(k);
+        }
+        setScene((s) => ({
+          ...s,
+          zones: [
+            ...s.zones.map((z) => (z.id === zone.id ? { ...z, surface: "porte" as const } : z)),
+            { id, name: `Cadre de ${zone.name}`, mask: null, finish: null, quad: null, repetitions: 4, lumiere: zone.lumiere, visible: true, surface: "cadre", aspect: null },
+          ],
+        }));
+        setActiveZoneId(id);
+        setCommitTick((t) => t + 1);
+        schedule();
+        toast.success("Cadre séparé : choisissez sa teinte (la porte garde la sienne)");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Séparation impossible");
+      } finally {
+        setBusy(null);
+      }
     },
     refineZone: async () => {
       const key = activeZoneId;

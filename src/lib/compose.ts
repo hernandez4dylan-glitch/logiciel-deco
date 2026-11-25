@@ -1,7 +1,7 @@
 import { drawComposition, prepareAsset, type ItemAsset } from "@/lib/render-scene";
 import { maskFromImage, newCanvas, cutByMask } from "@/lib/mask-canvas";
 import { canvasToDataUrl, loadImage, pathToDataUrl, photoEngine, photoUrl } from "@/lib/studio-api";
-import type { Item, Scene, Zone } from "@/lib/scene";
+import { zoneAspect, type Item, type Scene, type Zone } from "@/lib/scene";
 
 export type PhotoRow = { id: string; product_id: string; image_path: string; cutout_path: string | null };
 export type ProductImages = { id: string; image_url: string | null; cutout_url: string | null };
@@ -41,6 +41,8 @@ export async function finishPayload(zones: Zone[], mask: (z: Zone) => HTMLCanvas
       quad: z.quad ? z.quad.map(([x, y]) => [x * W, y * H]) : null,
       repetitions: z.repetitions,
       lumiere: z.lumiere,
+      finition: zoneAspect(z),
+      surface: z.surface,
     });
   }
   return out;

@@ -7,6 +7,31 @@
 export type Point = [number, number];
 export type Quad = [Point, Point, Point, Point];
 export type FinishKind = "peinture" | "papier" | "enduit";
+/** Nature de la surface sélectionnée : change la finition par défaut et le rendu (reflets). */
+export type Surface = "mur" | "plafond" | "porte" | "cadre" | "sol" | "autre";
+/** Aspect de la peinture : du plus mat au plus brillant. */
+export type Aspect = "mat" | "velours" | "satin" | "brillant";
+
+export const SURFACES: { id: Surface; label: string }[] = [
+  { id: "mur", label: "Mur" },
+  { id: "plafond", label: "Plafond" },
+  { id: "porte", label: "Porte" },
+  { id: "cadre", label: "Cadre / huisserie" },
+  { id: "sol", label: "Sol" },
+  { id: "autre", label: "Autre (boiserie, meuble)" },
+];
+export const ASPECTS: { id: Aspect; label: string }[] = [
+  { id: "mat", label: "Mat" },
+  { id: "velours", label: "Velours" },
+  { id: "satin", label: "Satiné" },
+  { id: "brillant", label: "Brillant" },
+];
+/** Finition habituelle d'une surface quand la teinte n'en précise pas. */
+export const SURFACE_ASPECT: Record<Surface, Aspect> = { mur: "mat", plafond: "mat", porte: "satin", cadre: "satin", sol: "satin", autre: "mat" };
+export const isAspect = (v: unknown): v is Aspect => typeof v === "string" && ASPECTS.some((a) => a.id === v);
+export const isSurface = (v: unknown): v is Surface => typeof v === "string" && SURFACES.some((a) => a.id === v);
+export const aspectLabel = (a: Aspect) => ASPECTS.find((x) => x.id === a)?.label ?? a;
+export const surfaceLabel = (s: Surface) => SURFACES.find((x) => x.id === s)?.label ?? s;
 
 /** Copie de la finition au moment du choix : la fiche client reste juste même si la bibliothèque change. */
 export type FinishSnapshot = {
@@ -16,6 +41,11 @@ export type FinishSnapshot = {
   reference: string | null;
   color: string | null;
   texture: string | null;
+  /** Fournisseur ou marque (saisi dans la bibliothèque), gamme. */
+  marque: string | null;
+  gamme: string | null;
+  /** Finition conseillée par la fiche (mat, velours…) ; pour un papier, texte libre (intissé…). */
+  finition: string | null;
 };
 
 export type Zone = {
@@ -31,7 +61,17 @@ export type Zone = {
   /** 1 = lumière d'origine conservée, 0 = aplat. */
   lumiere: number;
   visible: boolean;
+  surface: Surface;
+  /** Finition choisie pour cette surface ; null = celle de la teinte, sinon celle de la surface. */
+  aspect: Aspect | null;
 };
+
+/** Finition réellement rendue pour une zone. */
+export function zoneAspect(z: Pick<Zone, "aspect" | "finish" | "surface">): Aspect {
+  if (z.aspect) return z.aspect;
+  if (z.finish?.kind === "peinture" && isAspect(z.finish.finition)) return z.finish.finition;
+  return SURFACE_ASPECT[z.surface];
+}
 
 export type Shadow = { opacity: number; blur: number; size: number };
 
@@ -164,12 +204,17 @@ export function parseScene(text: string | null | undefined): Scene {
                   reference: str(f["reference"]),
                   color: str(f["color"]),
                   texture: str(f["texture"]),
+                  marque: str(f["marque"]),
+                  gamme: str(f["gamme"]),
+                  finition: str(f["finition"]),
                 }
               : null,
           quad: Array.isArray(q) && q.length === 4 && q.every(isPoint) ? (q as Quad) : null,
           repetitions: num(z["repetitions"], 4, 0.2, 60),
           lumiere: num(z["lumiere"], 1, 0, 2),
           visible: z["visible"] !== false,
+          surface: isSurface(z["surface"]) ? z["surface"] : "mur",
+          aspect: isAspect(z["aspect"]) ? z["aspect"] : null,
         };
       }),
     items: items
@@ -259,7 +304,15 @@ export type ProductLike = {
 };
 
 export type ReferenceLine = { productId: string; sku: string; name: string; qty: number; unit: number; total: number };
-export type FinishLine = { kind: FinishKind; name: string; reference: string | null; color: string | null; zones: string[] };
+export type FinishLine = {
+  kind: FinishKind;
+  name: string;
+  reference: string | null;
+  color: string | null;
+  marque: string | null;
+  aspect: Aspect | null;
+  zones: string[];
+};
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -278,8 +331,17 @@ export function referenceList(scene: Scene, products: ProductLike[], opts: { pro
   const finishes = new Map<string, FinishLine>();
   for (const z of scene.zones) {
     if (!z.finish || !z.visible || !z.mask) continue;
-    const key = `${z.finish.kind}|${z.finish.reference ?? ""}|${z.finish.name}|${z.finish.color ?? ""}`;
-    const f = finishes.get(key) ?? { kind: z.finish.kind, name: z.finish.name, reference: z.finish.reference, color: z.finish.color, zones: [] };
+    const aspect = z.finish.kind === "peinture" ? zoneAspect(z) : null;
+    const key = `${z.finish.kind}|${z.finish.marque ?? ""}|${z.finish.reference ?? ""}|${z.finish.name}|${z.finish.color ?? ""}|${aspect ?? ""}`;
+    const f = finishes.get(key) ?? {
+      kind: z.finish.kind,
+      name: z.finish.name,
+      reference: z.finish.reference,
+      color: z.finish.color,
+      marque: z.finish.marque,
+      aspect,
+      zones: [],
+    };
     f.zones.push(z.name);
     finishes.set(key, f);
   }
@@ -294,14 +356,21 @@ export function referenceRows(list: ReturnType<typeof referenceList>) {
   return [
     ...list.items.map((l) => ({ Type: "Article", Référence: l.sku, Désignation: l.name, Quantité: l.qty, "Prix unitaire TTC": l.unit, "Total TTC": l.total })),
     ...list.finishes.map((f) => ({
-      Type: f.kind === "peinture" ? "Peinture" : f.kind === "papier" ? "Papier peint" : "Enduit",
-      Référence: f.reference ?? "",
-      Désignation: f.color ? `${f.name} (${f.color})` : f.name,
+      Type: f.kind === "peinture" ? "Peinture" : f.kind === "papier" ? "Papier peint / revêtement" : "Enduit",
+      Référence: [f.marque, f.reference].filter(Boolean).join(" · "),
+      Désignation: finishLabel(f),
       Quantité: f.zones.length,
       "Prix unitaire TTC": "",
       "Total TTC": "",
     })),
   ];
+}
+
+/** « Marque – Nom (#couleur), satiné » pour la fiche client et le CSV. */
+export function finishLabel(f: Pick<FinishLine, "name" | "color" | "marque" | "aspect">) {
+  const nom = f.marque ? `${f.marque} – ${f.name}` : f.name;
+  const couleur = f.color ? ` (${f.color})` : "";
+  return `${nom}${couleur}${f.aspect ? `, ${aspectLabel(f.aspect).toLowerCase()}` : ""}`;
 }
 
 /** Rectangle par défaut pour un papier peint : la boîte englobante de la sélection. */
@@ -311,6 +380,17 @@ export function defaultQuad(bbox: { x0: number; y0: number; x1: number; y1: numb
     [bbox.x1, bbox.y0],
     [bbox.x1, bbox.y1],
     [bbox.x0, bbox.y1],
+  ];
+}
+
+/** Rectangle de départ pour un sol vu en perspective : le bord du fond est plus étroit. */
+export function floorQuad(bbox: { x0: number; y0: number; x1: number; y1: number }): Quad {
+  const w = bbox.x1 - bbox.x0;
+  return [
+    [bbox.x0 + w * 0.3, bbox.y0],
+    [bbox.x1 - w * 0.3, bbox.y0],
+    [bbox.x1 + w * 0.5, bbox.y1],
+    [bbox.x0 - w * 0.5, bbox.y1],
   ];
 }
 

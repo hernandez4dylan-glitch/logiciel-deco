@@ -40,7 +40,17 @@
 </tbody></table>
 <p class="note">Limites constatées : l’ombre de contact est une ombre douce réglable (intensité, douceur, étendue), pas une ombre calculée depuis les fenêtres du rendu. L’éclairage des articles n’est pas recalculé : choisir une photo d’article prise sous une lumière proche de celle de la pièce. La gomme sur un arrière-plan chargé (porte à lettres, plaid, autre fauteuil) donne un résultat médiocre : nous l’avons écartée de cette démonstration.</p>
 
-<h2>4. Outils photo des versions précédentes</h2>
+<h2>4. Surfaces et finitions : murs, plafond, porte, cadre, sol</h2>
+<p>Moteur de peinture refait (version du 25/11/2026) : la lumière de la photo est séparée de la couleur de chaque surface (éclairage, couleur de la lumière, grain), puis la nouvelle teinte est éclairée de la même façon. Chaque surface a son type (mur, plafond, porte, cadre, sol) et sa finition.</p>
+<div class="pair"><figure><img src="rendu-de-reference.jpg" alt="Rendu d'origine"><figcaption>Rendu d’origine</figcaption></figure><figure><img src="surfaces-apres.jpg" alt="Murs, plafond, porte, cadre et sol modifiés"><figcaption>Murs beige mat, plafond blanc mat, porte bleu nuit satinée, cadre séparé blanc satiné, sol parquet chêne en perspective (lumière du soleil conservée au sol)</figcaption></figure></div>
+<h3>Même porte, quatre finitions</h3>
+<figure><img src="finitions-porte.jpg" alt="Porte bleu nuit en mat, velours, satiné et brillant"><figcaption>Mat : aucune brillance, teinte profonde. Velours : lustre très doux. Satiné : reflet diffus du sol. Brillant : le fauteuil et la lumière au sol se reflètent nettement dans la porte.</figcaption></figure>
+<h3>Mur vert : mat, satiné, brillant</h3>
+<figure><img src="finitions-mur.jpg" alt="Mur vert en mat, satiné et brillant"><figcaption>Sur un grand mur, le reflet est plus diffus que sur une porte laquée (support moins lisse) ; la différence reste visible, surtout près du sol ensoleillé.</figcaption></figure>
+<p class="note">Comment c’est fait : la baguette sélectionne chaque surface en quelques clics (l’intérieur des lettres collées est repris automatiquement), « Séparer le cadre » détache l’huisserie de la porte, et les reflets satiné / brillant sont tirés de la pièce (sol, meubles) symétriquement par rapport au pied de la surface. Limites : le reflet est une approximation (pas de calcul 3D de la pièce) ; il n’y a pas encore de reflet des fenêtres hors champ ; les teintes d’exemple sont fictives : les nuanciers fournisseurs se saisissent ou s’importent (CSV) dans la bibliothèque.</p>
+<p>Reproduire : <code>runtime\windows\python.exe local\tests\essais_finitions.py</code></p>
+
+<h2>5. Outils photo des versions précédentes</h2>
 <h3>Gomme : effacer un meuble</h3>
 <div class="trio">
 <figure><img src="gomme-fauteuil-masque.jpg" alt="Zone peinte sur le fauteuil"><figcaption>Zone peinte</figcaption></figure>

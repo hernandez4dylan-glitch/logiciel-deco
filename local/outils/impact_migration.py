@@ -10,8 +10,33 @@ from data import migrer, VERSION  # noqa: E402
 
 def etat(db):
     tables = [r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")]
-    schema = {r[0]: r[1] for r in db.execute("SELECT name, sql FROM sqlite_master WHERE type='table'")}
-    return {t: (schema[t], sorted(map(tuple, db.execute(f'SELECT * FROM "{t}"').fetchall()), key=repr)) for t in tables}
+    out = {}
+    for t in tables:
+        cols = [r[1] for r in db.execute(f'PRAGMA table_info("{t}")')]
+        out[t] = (cols, [tuple(r) for r in db.execute(f'SELECT * FROM "{t}"').fetchall()])
+    return out
+
+
+def comparer(avant, apres):
+    """Pour chaque table existante : colonnes ajoutées, lignes ajoutées, et lignes
+    d'origine modifiées ou disparues (comparées sur les colonnes d'origine)."""
+    rapport = {}
+    for t, (cols, lignes) in avant.items():
+        cols2, lignes2 = apres.get(t, ([], []))
+        if cols2[:len(cols)] != cols:
+            rapport[t] = {'colonnes_retirees_ou_deplacees': True}
+            continue
+        anciennes = sorted(lignes, key=repr)
+        coupees = [l[:len(cols)] for l in lignes2]
+        restantes = list(coupees)
+        perdues = 0
+        for l in anciennes:
+            if l in restantes:
+                restantes.remove(l)
+            else:
+                perdues += 1
+        rapport[t] = {'colonnes_ajoutees': cols2[len(cols):], 'lignes_ajoutees': len(restantes), 'lignes_modifiees_ou_perdues': perdues}
+    return rapport
 
 
 def main(chemin):
@@ -20,15 +45,18 @@ def main(chemin):
     v0 = db.execute('PRAGMA user_version').fetchone()[0]
     v1 = migrer(db)
     apres = etat(db)
-    modifiees = [t for t in avant if apres.get(t) != avant[t]]
-    nouvelles = {t: len(apres[t][1]) for t in apres if t not in avant}
+    rapport = comparer(avant, apres)
+    abimees = [t for t, r in rapport.items() if r.get('colonnes_retirees_ou_deplacees') or r.get('lignes_modifiees_ou_perdues')]
     print(f'Version : {v0} -> {v1} (attendue {VERSION})')
-    print('Tables existantes modifiées (schéma ou lignes) :', modifiees or 'aucune')
-    print('Nouvelles tables (lignes ajoutées) :', nouvelles)
+    for t, r in rapport.items():
+        if r.get('colonnes_ajoutees') or r.get('lignes_ajoutees') or t in abimees:
+            print(f'  {t} : {r}')
+    print('Tables existantes dont des données ont changé :', abimees or 'aucune')
+    print('Nouvelles tables (lignes) :', {t: len(apres[t][1]) for t in apres if t not in avant})
     print('Intégrité après migration :', db.execute('PRAGMA integrity_check').fetchone()[0])
     print('Deuxième passage (idempotent) :', migrer(db) == v1 and etat(db) == apres)
     db.close()
-    sys.exit(1 if modifiees else 0)
+    sys.exit(1 if abimees else 0)
 
 
 if __name__ == '__main__':

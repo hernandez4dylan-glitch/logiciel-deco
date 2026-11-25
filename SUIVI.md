@@ -57,6 +57,27 @@
 - Vérifié dans le navigateur sur données de test et par export PNG (carte des différences : ombre projetée visible).
   Fausse alerte écartée : lenteur apparente due au navigateur intégré sans focus (1 image/s), le logiciel réagit en ~34 ms.
 
+## Rendu des peintures et finitions (25/11/2026, fin d'après-midi)
+Demande : rendu « digne d'un studio photo », différencier portes / cadres / murs / plafonds / sols, peintures et
+papiers saisis comme des produits (marque, ex. un fournisseur), finitions mat / velours / satiné nettement visibles.
+- [x] Moteur refait (local/finitions.py) : travail en lumière linéaire, éclairage et couleur de la lumière séparés de la
+  couleur de la surface, grain conservé, bords nets ; reflets mesurés (porte bleu nuit : mat plat, brillant reflète le fauteuil).
+- [x] Approches abandonnées : reflet « normalisé sur son maximum » (tache sur une porte uniforme), reflet d'environnement
+  pris sur la surface elle-même (voile laiteux de l'ancienne teinte), reflets trop forts (bleu nuit devenu gris) → reflet
+  absolu, pris hors de la surface, 4 à 10 %, plus diffus sur un grand mur que sur une porte.
+- [x] Surfaces typées (mur, plafond, porte, cadre, sol, autre), finition par surface, « Séparer le cadre » (enveloppe
+  extérieure : les lettres collées ne créent pas de faux cadre), sol en perspective (parquet d'exemple dessiné ici).
+- [x] Baguette : intérieurs de lettres et taches de soleil entre brindilles repris ; GrabCut rendu déterministe
+  (même clic = même sélection ; un trou rempli pouvait disparaître d'un lancement à l'autre).
+- [x] Teintes comme produits : migration 4 additive (marque, gamme, usage + parquet d'exemple), testée sur une copie de la
+  base réelle : 3 colonnes et 1 ligne ajoutées, aucune donnée existante modifiée, intégrité ok, idempotente.
+  La base réelle n'est pas encore migrée : elle le sera au prochain lancement du logiciel.
+- [x] Import de nuancier CSV (modèle à télécharger, aperçu, mise à jour sans doublon sur marque + référence).
+- [x] Vérifié dans le navigateur sur données de test : porte + cadre séparé, teinte créée avec marque, passage en brillant,
+  import CSV (2 nouvelles, 1 mise à jour, 1 refusée), projet rouvert à l'identique, console sans erreur.
+- Aucune référence réelle de fournisseur n'a été inventée : les teintes livrées sont des exemples fictifs.
+- Limite : les reflets sont une approximation 2D (symétrie par rapport au pied de la surface), sans fenêtres hors champ.
+
 ## Tâches
 - [x] Vérification automatique installée (.claude/hooks/verifier.ps1 + .claude/settings.json)
 - [x] Base : migrations sans perte (teintes/matières, photos d'article, projets, variantes) + tests

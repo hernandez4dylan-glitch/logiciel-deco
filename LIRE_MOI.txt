@@ -32,8 +32,10 @@ et confirme que l'original n'a pas changé (message « SAUVEGARDE VALIDÉE »).
 local\outils\impact_migration.py <copie de boutique.sqlite3> montre sur une copie
 ce que la nouvelle version ajoutera à la base, sans toucher à l'original.
 Au premier lancement de cette version, la base existante reçoit de nouvelles
-tables (teintes et matières, photos d’article, projets) : le catalogue, les
-ventes, les dépenses et les photos déjà enregistrés ne sont pas modifiés.
+tables (teintes et matières, photos d’article, projets) et, pour les teintes,
+trois colonnes (marque, gamme, usage) plus un parquet d’exemple : le catalogue,
+les ventes, les dépenses, les teintes et les photos déjà enregistrés ne sont pas
+modifiés.
 
 Gérer la boutique
 Dans « Catalogue & Stock », le crayon modifie un article (prix, fournisseur,
@@ -59,16 +61,32 @@ Ouvrez « Espace Pro Décorateurs », puis « Studio Plan & 3D ».
    de la pièce. Le format est conservé (panoramique, vertical) ; l’image est
    seulement réduite à 2400 pixels sur le grand côté. Sans image, une pièce
    vierge est générée.
-2. Onglet « Murs » : « Nouveau mur », puis la baguette : un clic sur le mur le
+2. Onglet « Murs » : « + Mur », « + Plafond », « + Porte », « + Sol » ou
+   « + Autre » crée une surface de ce type, puis la baguette : un clic la
    sélectionne jusqu’aux arêtes, cadres et plinthes (cliquez plusieurs fois si
-   la lumière varie beaucoup). « Ajouter » et « Protéger » corrigent au pinceau
+   la lumière varie beaucoup ; l’intérieur des lettres collées est repris). « Ajouter » et « Protéger » corrigent au pinceau
    (fenêtre, plinthe, meuble devant le mur) ; « Affiner les bords » recale le
    contour sur la photo. Un clic sur une teinte de la bibliothèque l’applique :
    la lumière de la pièce est conservée (côté fenêtre plus clair). Pour un papier
    peint, réglez la taille du motif et « Aligner sur la perspective » (glissez
    les 4 coins sur les angles du mur). Un enduit utilise la photo d’échantillon.
-   « Ajouter » dans la bibliothèque enregistre une teinte ou une matière avec son
-   nom, sa référence magasin, sa couleur, son motif ou sa photo d’échantillon.
+   Porte : sélectionnez la porte avec son huisserie, réglez la largeur du cadre
+   puis « Séparer le cadre » : le cadre devient une surface à part (cadre blanc
+   satiné, porte colorée…). Sol : choisissez un motif de l’onglet « Papiers &
+   sols » (parquet…) puis alignez les 4 coins sur la perspective du sol.
+   Finition : Mat, Velours, Satiné ou Brillant, en un clic sous la surface.
+   Par défaut, celle de la fiche de la teinte, sinon celle de la surface (mur et
+   plafond mat, porte et cadre satiné). Le mat absorbe la lumière ; velours,
+   satiné puis brillant reflètent de plus en plus le sol, les meubles et la
+   lumière (plus nettement sur une porte que sur un grand mur).
+   « Ajouter » dans la bibliothèque enregistre une teinte ou une matière comme un
+   produit : marque (fournisseur), gamme, nom, référence, couleur, finition et
+   usage conseillé (mur, porte, sol…), ou son motif / sa photo d’échantillon.
+   « Importer » charge un nuancier fournisseur depuis Excel : téléchargez le
+   modèle, une ligne par teinte, enregistrez au format CSV et choisissez-le ;
+   un aperçu montre les teintes nouvelles, mises à jour (même marque et même
+   référence : pas de doublon) et les lignes refusées avant d’importer.
+   La recherche et le filtre « marque » retrouvent une teinte dans la bibliothèque.
    La « Pipette » prélève une couleur sur la photo (coussin, tissu, échantillon)
    et l’applique au mur ; « Enregistrer cette teinte » lui donne une référence.
 3. Onglet « Articles » : cliquez un article du catalogue, glissez-le par sa base
@@ -119,7 +137,9 @@ Python inclus ; ils utilisent un dossier temporaire, jamais vos données).
 runtime\windows\python.exe local\tests\essais_photo.py et essais_studio.py
 régénèrent les images de Essai_photo. Le moteur photo est dans local\photo.py
 (point d’entrée), local\detourage.py (détourage), local\finitions.py (murs),
-local\gomme.py (effacement) et local\retouche.py (décor). Le studio est dans
+local\gomme.py (effacement) et local\retouche.py (décor).
+essais_finitions.py régénère les démos des surfaces et finitions (mat, velours,
+satiné, brillant). Le studio est dans
 src\components\studio et src\lib (scene.ts, render-scene.ts, compose.ts).
 Pour essayer le serveur sur des données de test, définissez ATELIER_DATA vers
 un dossier vide avant de lancer runtime\windows\python.exe local\server.py.
