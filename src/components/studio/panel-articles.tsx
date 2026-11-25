@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Copy, Crosshair, FlipHorizontal2, Layers, Paintbrush, Scissors, Search, ShieldMinus, Trash2, Wand2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, Crosshair, FlipHorizontal2, Layers, Paintbrush, Scissors, Search, ShieldMinus, Sun, Trash2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -122,12 +122,58 @@ export function PanelArticles({ api }: { api: WorkspaceApi }) {
           <Row label="Étendue">
             <Slider min={0.2} max={2.5} step={0.05} value={[it.shadow.size]} onValueChange={([v]) => api.updateItem(it.uid, { shadow: { ...it.shadow, size: v ?? 1 } })} aria-label="Étendue de l'ombre" />
           </Row>
+          <p className="mt-1 text-xs font-medium text-muted-foreground">Lumière de l'article</p>
+          <div className="flex flex-wrap gap-1">
+            <Button size="sm" variant="outline" disabled={!asset} onClick={() => api.accordItem(it.uid)} title="Adapte la luminosité et la teinte de l'article à la pièce autour de lui">
+              <Sun className="h-4 w-4" /> Accorder à la pièce
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => api.updateItem(it.uid, { light: { bright: 1, warm: 0 } })}>
+              Photo d'origine
+            </Button>
+          </div>
+          <Row label={`Luminosité : ${Math.round(it.light.bright * 100)} %`}>
+            <Slider min={0.5} max={1.5} step={0.01} value={[it.light.bright]} onValueChange={([v]) => api.updateItem(it.uid, { light: { ...it.light, bright: v ?? 1 } })} aria-label="Luminosité de l'article" />
+          </Row>
+          <Row label={`Teinte de la lumière : ${it.light.warm > 0.02 ? "chaude" : it.light.warm < -0.02 ? "froide" : "neutre"}`}>
+            <Slider min={-1} max={1} step={0.02} value={[it.light.warm]} onValueChange={([v]) => api.updateItem(it.uid, { light: { ...it.light, warm: v ?? 0 } })} aria-label="Teinte de la lumière" />
+          </Row>
           <label className="mt-1 flex items-center justify-between gap-2 text-xs">
             <span>Passe derrière le premier plan</span>
             <Switch checked={it.behind} onCheckedChange={(behind) => api.updateItem(it.uid, { behind })} aria-label="Passe derrière le premier plan" />
           </label>
         </section>
       )}
+
+      <section className="grid gap-2 rounded-lg border p-2">
+        <p className="flex items-center gap-1 font-medium"><Sun className="h-4 w-4" /> Ombre portée (lumière de la pièce)</p>
+        <p className="text-xs text-muted-foreground">Une seule lumière pour toute la pièce : tous les articles projettent leur ombre dans la même direction.</p>
+        <Row label={api.scene.cast.length > 0 ? `Longueur : ${Math.round(api.scene.cast.length * 100)} %` : "Longueur : sans ombre portée"}>
+          <Slider min={0} max={2} step={0.05} value={[api.scene.cast.length]} onValueChange={([v]) => api.setCast({ length: v ?? 0 })} aria-label="Longueur de l'ombre portée" />
+        </Row>
+        {api.scene.cast.length > 0 && (
+          <>
+            <Row label={`Direction : ${api.scene.cast.direction > 0 ? "vers la droite" : api.scene.cast.direction < 0 ? "vers la gauche" : "droite devant"} (${Math.abs(api.scene.cast.direction)}°)`}>
+              <Slider min={-70} max={70} step={1} value={[api.scene.cast.direction]} onValueChange={([v]) => api.setCast({ direction: v ?? 0 })} aria-label="Direction de l'ombre portée" />
+            </Row>
+            <Row label={`Intensité : ${Math.round(api.scene.cast.opacity * 100)} %`}>
+              <Slider min={0.05} max={0.8} step={0.05} value={[api.scene.cast.opacity]} onValueChange={([v]) => api.setCast({ opacity: v ?? 0.35 })} aria-label="Intensité de l'ombre portée" />
+            </Row>
+            <div className="flex rounded-md border p-0.5 text-xs" role="group" aria-label="Sens de l'ombre portée">
+              {([[true, "Vers le fond (lumière de face)"], [false, "Vers l'avant (contre-jour)"]] as const).map(([v, label]) => (
+                <button
+                  key={label}
+                  type="button"
+                  aria-pressed={api.scene.cast.behind === v}
+                  onClick={() => api.setCast({ behind: v })}
+                  className={cn("flex-1 rounded px-1 py-1", api.scene.cast.behind === v ? "bg-primary text-primary-foreground" : "hover:bg-muted")}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </section>
 
       <section className="grid gap-2 rounded-lg border p-2">
         <p className="flex items-center gap-1 font-medium"><Layers className="h-4 w-4" /> Premier plan existant</p>

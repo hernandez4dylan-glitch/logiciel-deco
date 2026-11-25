@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Brush, Image as ImageIcon, Loader2, Package, Paintbrush2 } from "lucide-react";
+import { Brush, Image as ImageIcon, Loader2, Package, Paintbrush2, Redo2, Undo2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Stage, BRUSH_TOOLS, type StageHandle, type StageTool } from "@/components/studio/stage";
 import { PanelMurs } from "@/components/studio/panel-murs";
@@ -14,7 +15,8 @@ import type { StudioRows } from "@/lib/records";
 import { cutByMask, maskBounds, maskFromImage, newCanvas, strokeMask, tinted } from "@/lib/mask-canvas";
 import type { ItemAsset } from "@/lib/render-scene";
 import { finishPayload, itemImagePath, loadAsset, renderFinished } from "@/lib/compose";
-import { defaultQuad, parseScene, popHistory, pushHistory, serializeScene, type Item, type Point, type Quad, type Scene, type Zone } from "@/lib/scene";
+import { defaultQuad, itemBox, parseScene, popHistory, pushHistory, serializeScene, type CastShadow, type Item, type Point, type Quad, type Scene, type Zone } from "@/lib/scene";
+import { accordLight, stats as lumStats, UndoStack } from "@/lib/lumiere";
 import { sampleColor } from "@/lib/couleur";
 import { canvasToBlob, canvasToDataUrl, loadImage, pathToDataUrl, photoEngine, photoUrl, uploadBlob } from "@/lib/studio-api";
 
@@ -59,6 +61,8 @@ export type WorkspaceApi = {
   duplicateItem: (uid: string) => void;
   moveItem: (uid: string, dir: -1 | 1) => void;
   assetFor: (item: Item) => ItemAsset | undefined;
+  accordItem: (uid: string) => void;
+  setCast: (patch: Partial<CastShadow>) => void;
   // photo
   basePath: string;
   retouch: (mode: "erase" | "decor", extra?: Record<string, unknown>) => Promise<void>;
@@ -186,8 +190,46 @@ export function Workspace({
     return () => window.removeEventListener("beforeunload", warn);
   }, [flush]);
 
+  const undo = useRef(new UndoStack<string>(80));
+  const lastRecord = useRef(0);
+  const [, setUndoTick] = useState(0);
+  /** Annuler / rétablir les articles, réglages et finitions (les tracés au pinceau ont leur propre « Annuler »). */
+  const stepHistory = useCallback(
+    (dir: "undo" | "redo") => {
+      const cur = serializeScene(sceneRef.current);
+      const next = dir === "undo" ? undo.current.undo(cur) : undo.current.redo(cur);
+      if (next === null) return;
+      lastRecord.current = 0;
+      sceneRef.current = parseScene(next);
+      setSceneState(sceneRef.current);
+      setUndoTick((t) => t + 1);
+      dirty.current = true;
+      schedule();
+    },
+    [schedule],
+  );
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === "z" && !e.shiftKey) stepHistory("undo");
+      else if (k === "y" || (k === "z" && e.shiftKey)) stepHistory("redo");
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [stepHistory]);
+
   const setScene = useCallback(
     (fn: (s: Scene) => Scene) => {
+      // Une étape d'annulation par geste : les changements rapprochés (glisser, curseur) sont regroupés.
+      const now = Date.now();
+      if (now - lastRecord.current > 600) undo.current.record(serializeScene(sceneRef.current));
+      lastRecord.current = now;
+      setUndoTick((t) => t + 1);
       sceneRef.current = fn(sceneRef.current);
       setSceneState(sceneRef.current);
       dirty.current = true;
@@ -521,7 +563,7 @@ export function Workspace({
         ...s,
         items: [
           ...s.items,
-          { uid, productId: p.id, photoId: null, x: 0.5, y: 0.86, h: kindHeight[p.category] ?? 0.25, flip: false, rot: 0, shadow: { opacity: 0.45, blur: 0.5, size: 1 }, behind: false },
+          { uid, productId: p.id, photoId: null, x: 0.5, y: 0.86, h: kindHeight[p.category] ?? 0.25, flip: false, rot: 0, shadow: { opacity: 0.45, blur: 0.5, size: 1 }, behind: false, light: { bright: 1, warm: 0 } },
         ],
       }));
       setSelectedUid(uid);
@@ -549,6 +591,34 @@ export function Workspace({
         return { ...s, items };
       }),
     assetFor,
+    accordItem: (uid) => {
+      // Lumière de la pièce autour de la base de l'article, comparée à celle de sa photo.
+      const it = sceneRef.current.items.find((i) => i.uid === uid);
+      const a = it ? assetFor(it) : undefined;
+      if (!it || !a || !background) return;
+      const b = itemBox(it, a.aspect, W, H);
+      const x0 = Math.max(0, b.x - b.w * 0.3), y0 = Math.max(0, b.y - b.h * 0.1);
+      const x1 = Math.min(W, b.x + b.w * 1.3), y1 = Math.min(H, b.y + b.h * 1.15);
+      const s = Math.min(1, 160 / Math.max(x1 - x0, y1 - y0, 1));
+      const rw = Math.max(1, Math.round((x1 - x0) * s)), rh = Math.max(1, Math.round((y1 - y0) * s));
+      const room = newCanvas(rw, rh).getContext("2d", { willReadFrequently: true })!;
+      room.drawImage(background, x0, y0, x1 - x0, y1 - y0, 0, 0, rw, rh);
+      // On exclut l'emprise de l'article lui-même : seule compte la pièce autour.
+      const ix0 = (b.x - x0) * s, ix1 = (b.x + b.w - x0) * s, iy0 = (b.y - y0) * s, iy1 = (b.y + b.h - y0) * s;
+      const local = lumStats(room.getImageData(0, 0, rw, rh).data, (p) => {
+        const px = p % rw, py = (p / rw) | 0;
+        return px < ix0 || px > ix1 || py < iy0 || py > iy1;
+      });
+      const pw = Math.max(1, Math.round(a.sw * Math.min(1, 160 / Math.max(a.sw, a.sh))));
+      const ph = Math.max(1, Math.round(a.sh * Math.min(1, 160 / Math.max(a.sw, a.sh))));
+      const prod = newCanvas(pw, ph).getContext("2d", { willReadFrequently: true })!;
+      prod.drawImage(a.img, a.sx, a.sy, a.sw, a.sh, 0, 0, pw, ph);
+      const own = lumStats(prod.getImageData(0, 0, pw, ph).data);
+      if (!local || !own) return;
+      updateItem(uid, { light: accordLight(local, own) });
+      toast.success("Lumière de l'article accordée à la pièce");
+    },
+    setCast: (patch) => setScene((s) => ({ ...s, cast: { ...s.cast, ...patch } })),
     basePath,
     retouch: async (mode, extra = {}) => {
       const m = masks.current.get("retouche");
@@ -698,6 +768,15 @@ export function Workspace({
         </Tabs>
       </aside>
       <section className="order-1 min-w-0 xl:order-2">
+        <div className="mb-2 flex items-center gap-1 print:hidden">
+          <Button size="sm" variant="ghost" disabled={!undo.current.canUndo} onClick={() => stepHistory("undo")} title="Annuler (Ctrl+Z)">
+            <Undo2 className="h-4 w-4" /> Annuler
+          </Button>
+          <Button size="sm" variant="ghost" disabled={!undo.current.canRedo} onClick={() => stepHistory("redo")} title="Rétablir (Ctrl+Y)">
+            <Redo2 className="h-4 w-4" /> Rétablir
+          </Button>
+          <span className="text-xs text-muted-foreground">articles, réglages et finitions</span>
+        </div>
         <Stage
           ref={stage}
           W={W}
@@ -712,6 +791,7 @@ export function Workspace({
           tool={tool}
           brush={brush}
           quad={activeZone?.quad ?? null}
+          cast={scene.cast}
           onSelect={setSelectedUid}
           onItemChange={updateItem}
           onItemCommit={() => undefined}

@@ -1,4 +1,5 @@
-import { drawOrder, itemBox, type Box, type Item } from "@/lib/scene";
+import { drawOrder, itemBox, NEUTRAL_LIGHT, type Box, type CastShadow, type Item, type ItemLight } from "@/lib/scene";
+import { castMatrix, lightFilter, warmTint } from "@/lib/lumiere";
 import { newCanvas } from "@/lib/mask-canvas";
 
 /** Photo d'article prête à poser : image, partie utile (sans marges transparentes), silhouette. */
@@ -75,13 +76,50 @@ export function drawShadow(ctx: CanvasRenderingContext2D, item: Item, box: Box, 
   ctx.restore();
 }
 
+/** Ombre portée : silhouette projetée au sol depuis la base, selon la lumière de la pièce. */
+export function drawCast(ctx: CanvasRenderingContext2D, item: Item, box: Box, asset: ItemAsset, cast: CastShadow) {
+  if (cast.length <= 0 || cast.opacity <= 0) return;
+  const m = castMatrix(box, cast);
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, cast.opacity);
+  ctx.filter = `blur(${Math.max(1.5, box.w * 0.025 * (0.6 + cast.length))}px)`;
+  ctx.transform(m.a, m.b, m.c, m.d, m.e, m.f);
+  if (item.flip) ctx.scale(-1, 1);
+  ctx.drawImage(asset.silhouette, -box.w / 2, -box.h, box.w, box.h);
+  ctx.restore();
+}
+
+/** Copie de l'article ajustée à la lumière de la pièce (luminosité, chaleur), mise en cache. */
+const litCache = new WeakMap<ItemAsset, { key: string; canvas: HTMLCanvasElement }>();
+function litImage(asset: ItemAsset, light: ItemLight): CanvasImageSource {
+  const tint = warmTint(light.warm);
+  if (light.bright === 1 && !tint) return asset.img;
+  const key = `${light.bright}|${light.warm}`;
+  const hit = litCache.get(asset);
+  if (hit?.key === key) return hit.canvas;
+  const c = newCanvas(asset.sw, asset.sh);
+  const ctx = c.getContext("2d")!;
+  ctx.filter = lightFilter(light);
+  ctx.drawImage(asset.img, asset.sx, asset.sy, asset.sw, asset.sh, 0, 0, asset.sw, asset.sh);
+  ctx.filter = "none";
+  if (tint) {
+    ctx.globalCompositeOperation = "source-atop"; // le voile reste sur l'article, pas sur la transparence
+    ctx.fillStyle = tint;
+    ctx.fillRect(0, 0, c.width, c.height);
+  }
+  litCache.set(asset, { key, canvas: c });
+  return c;
+}
+
 export function drawItem(ctx: CanvasRenderingContext2D, item: Item, box: Box, asset: ItemAsset) {
   ctx.save();
   ctx.translate(box.x + box.w / 2, box.y + box.h);
   if (item.rot) ctx.rotate((item.rot * Math.PI) / 180);
   if (item.flip) ctx.scale(-1, 1);
   ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(asset.img, asset.sx, asset.sy, asset.sw, asset.sh, -box.w / 2, -box.h, box.w, box.h);
+  const src = litImage(asset, item.light ?? NEUTRAL_LIGHT);
+  if (src === asset.img) ctx.drawImage(asset.img, asset.sx, asset.sy, asset.sw, asset.sh, -box.w / 2, -box.h, box.w, box.h);
+  else ctx.drawImage(src, -box.w / 2, -box.h, box.w, box.h);
   ctx.restore();
 }
 
@@ -100,6 +138,7 @@ export function drawComposition(
     asset: (item: Item) => ItemAsset | undefined;
     foreground: CanvasImageSource | null;
     boxes?: Map<string, Box>;
+    cast?: CastShadow;
   },
 ) {
   ctx.drawImage(o.background, 0, 0, o.W, o.H);
@@ -114,7 +153,10 @@ export function drawComposition(
     if (!a) continue;
     const box = itemBox(it, a.aspect, o.W, o.H);
     o.boxes?.set(it.uid, box);
-    if (a.cut) drawShadow(ctx, it, box, a);
+    if (a.cut) {
+      if (o.cast) drawCast(ctx, it, box, a, o.cast);
+      drawShadow(ctx, it, box, a);
+    }
     drawItem(ctx, it, box, a);
   }
   if (!fgDone) ctx.drawImage(o.foreground!, 0, 0, o.W, o.H);

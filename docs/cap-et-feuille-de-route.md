@@ -24,6 +24,7 @@ Les clients de la boutique et ceux des décorateurs meublent leur intérieur ave
 - [x] Studio : bibliothèque de teintes avec référence magasin, **pipette**
 - [x] Studio : gomme, remplacement de décor, **annuler la dernière retouche**
 - [x] Studio : articles ancrés au sol ou sur un meuble, échelle, miroir, ombre réglable, premier plan
+- [x] Studio : lumière des articles accordée à la pièce, ombre portée orientée, annuler / rétablir (Ctrl+Z / Ctrl+Y)
 - [x] Studio : projets clients enregistrés, variantes, comparaison, visuel PNG, fiche client, références CSV
 - [x] Outils sans crédits : tout fonctionne sur le PC, sans clé API ni coût par rendu
 - [ ] Rendu photoréaliste complet (rééclairage de toute la scène) : non réalisable en local à ce jour

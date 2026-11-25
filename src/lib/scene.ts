@@ -50,12 +50,30 @@ export type Item = {
   shadow: Shadow;
   /** Passe derrière les éléments existants peints en « premier plan ». */
   behind: boolean;
+  /** Lumière propre à l'article : luminosité (1 = photo d'origine) et chaleur (−1 froid … +1 chaud). */
+  light: ItemLight;
 };
+
+export type ItemLight = { bright: number; warm: number };
+export const NEUTRAL_LIGHT: ItemLight = { bright: 1, warm: 0 };
+
+/** Ombre portée commune à toute la pièce (une seule source de lumière principale). */
+export type CastShadow = {
+  /** 0 = pas d'ombre portée ; 1 = longueur égale à environ un tiers de la hauteur de l'article. */
+  length: number;
+  /** Inclinaison de l'ombre, en degrés (négatif = vers la gauche). */
+  direction: number;
+  /** true : l'ombre part vers le fond de la pièce (lumière de face) ; false : vers l'avant. */
+  behind: boolean;
+  opacity: number;
+};
+export const DEFAULT_CAST: CastShadow = { length: 0, direction: -25, behind: true, opacity: 0.35 };
 
 export type Scene = {
   version: 1;
   zones: Zone[];
   items: Item[];
+  cast: CastShadow;
   /** Masque PNG des éléments de la photo qui passent devant les articles marqués « derrière ». */
   foreground: string | null;
   /** Photo importée avant toute gomme ou changement de décor (pour revenir en arrière). */
@@ -92,7 +110,7 @@ export function popHistory(scene: Scene): { scene: Scene; base: string } | null 
 
 export const DEFAULT_SHADOW: Shadow = { opacity: 0.45, blur: 0.5, size: 1 };
 
-export const newScene = (): Scene => ({ version: 1, zones: [], items: [], foreground: null, baseOriginal: null, baseHistory: [] });
+export const newScene = (): Scene => ({ version: 1, zones: [], items: [], cast: { ...DEFAULT_CAST }, foreground: null, baseOriginal: null, baseHistory: [] });
 
 const num = (v: unknown, d: number, min = -Infinity, max = Infinity) =>
   typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : d;
@@ -113,6 +131,12 @@ export function parseScene(text: string | null | undefined): Scene {
   return {
     version: 1,
     foreground: str(raw["foreground"]),
+    cast: ((c: Record<string, unknown>) => ({
+      length: num(c["length"], DEFAULT_CAST.length, 0, 2),
+      direction: num(c["direction"], DEFAULT_CAST.direction, -75, 75),
+      behind: c["behind"] !== false,
+      opacity: num(c["opacity"], DEFAULT_CAST.opacity, 0, 1),
+    }))((raw["cast"] ?? {}) as Record<string, unknown>),
     baseOriginal: str(raw["baseOriginal"]),
     baseHistory: (Array.isArray(raw["baseHistory"]) ? (raw["baseHistory"] as Record<string, unknown>[]) : [])
       .filter((h) => h && typeof h === "object" && typeof h["base"] === "string")
@@ -167,6 +191,10 @@ export function parseScene(text: string | null | undefined): Scene {
             size: num(s["size"], DEFAULT_SHADOW.size, 0, 3),
           },
           behind: i["behind"] === true,
+          light: {
+            bright: num((i["light"] as Record<string, unknown> | undefined)?.["bright"], 1, 0.4, 1.8),
+            warm: num((i["light"] as Record<string, unknown> | undefined)?.["warm"], 0, -1, 1),
+          },
         };
       }),
   };

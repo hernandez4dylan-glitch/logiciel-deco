@@ -29,6 +29,7 @@ const item = (p: Partial<Item> = {}): Item => ({
   rot: 0,
   shadow: { opacity: 0.4, blur: 0.5, size: 1 },
   behind: false,
+  light: { bright: 1, warm: 0 },
   ...p,
 });
 

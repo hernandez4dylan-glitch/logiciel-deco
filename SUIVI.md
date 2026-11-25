@@ -50,6 +50,13 @@
   (moins précis que le moteur actuel), recadrage forcé 4:3.
 - [x] Éléments utiles intégrés, vitest (25) + Python (35) + build OK, vérifiés dans le navigateur sur données de test.
 
+## Avancement du 25/11/2026 (après-midi)
+- [x] Lumière des articles : « Accorder à la pièce » (luminosité et teinte mesurées autour de la base, adaptation partielle) + réglages manuels.
+- [x] Ombre portée commune à la pièce : longueur, direction, vers le fond / vers l'avant, intensité ; projection de la silhouette depuis la base.
+- [x] Annuler / rétablir (Ctrl+Z / Ctrl+Y, boutons) sur articles, réglages et finitions, gestes regroupés.
+- Vérifié dans le navigateur sur données de test et par export PNG (carte des différences : ombre projetée visible).
+  Fausse alerte écartée : lenteur apparente due au navigateur intégré sans focus (1 image/s), le logiciel réagit en ~34 ms.
+
 ## Tâches
 - [x] Vérification automatique installée (.claude/hooks/verifier.ps1 + .claude/settings.json)
 - [x] Base : migrations sans perte (teintes/matières, photos d'article, projets, variantes) + tests

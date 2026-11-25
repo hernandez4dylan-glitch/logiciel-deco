@@ -76,7 +76,11 @@ Ouvrez « Espace Pro Décorateurs », puis « Studio Plan & 3D ».
    curseur. « Poser sur un support » puis un clic sur le sol ou le plateau d’une
    console y pose exactement la base de l’article. Ombre de contact réglable
    (intensité, douceur, étendue), miroir, inclinaison, angle de vue si l’article
-   a plusieurs photos. « Premier plan existant » : sélectionnez à la baguette ou
+   a plusieurs photos. « Accorder à la pièce » adapte la luminosité et la teinte
+   de l’article à l’endroit où il est posé (réglables ensuite à la main).
+   « Ombre portée » : une lumière pour toute la pièce (longueur, direction, vers
+   le fond ou vers l’avant), que tous les articles suivent.
+   « Premier plan existant » : sélectionnez à la baguette ou
    au pinceau un meuble de la photo ; les articles « Passe derrière le premier
    plan » sont alors masqués par lui.
 4. Onglet « Photo » : gomme (un objet à la fois, sur un fond simple) et
@@ -89,11 +93,13 @@ Ouvrez « Espace Pro Décorateurs », puis « Studio Plan & 3D ».
    (visuel, références, quantités, finitions ; choisissez « Enregistrer au format
    PDF » dans la fenêtre d’impression), « Références (CSV) » pour Excel.
    Le tarif Public ou Pro se choisit dans la liste chiffrée.
+Ctrl+Z / Ctrl+Y (ou les boutons Annuler / Rétablir au-dessus de l’image)
+reviennent sur les déplacements, réglages et finitions.
 Tout est enregistré automatiquement (« Enregistré » en haut à droite) : fermez
 le logiciel et rouvrez le projet dans la liste pour reprendre.
-Limites : les ombres sont des ombres de contact douces, pas un calcul de la
-lumière des fenêtres ; la lumière des articles ajoutés n’est pas recalculée ;
-le rééclairage complet d’un rendu génératif n’est pas réalisé. Chaque calcul
+Limites : l’ombre portée est une projection réglée à la main (pas un calcul
+depuis les fenêtres) ; l’accord de lumière ajuste luminosité et teinte, sans
+recréer les reflets ; le rééclairage complet d’un rendu génératif n’est pas réalisé. Chaque calcul
 (baguette, finitions) prend de 1 à 5 secondes sur un PC de bureau.
 Dans « Catalogue & Stock », « Retouche showroom » prépare une photo d’annonce :
 détourage, correction automatique de la lumière, fond uni ou décor clair avec

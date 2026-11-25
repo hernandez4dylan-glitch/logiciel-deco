@@ -3,7 +3,7 @@ import { Maximize2, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { drawComposition, type ItemAsset } from "@/lib/render-scene";
-import { fitView, hitItem, toImage, zoomAt, type Box, type Item, type Point, type Quad, type View } from "@/lib/scene";
+import { fitView, hitItem, toImage, zoomAt, type Box, type CastShadow, type Item, type Point, type Quad, type View } from "@/lib/scene";
 
 export type StageTool =
   | "deplacer"
@@ -41,6 +41,7 @@ export function Stage({
   tool,
   brush,
   quad,
+  cast,
   onSelect,
   onItemChange,
   onItemCommit,
@@ -62,6 +63,7 @@ export function Stage({
   tool: StageTool;
   brush: number;
   quad: Quad | null;
+  cast?: CastShadow | undefined;
   onSelect: (uid: string | null) => void;
   onItemChange: (uid: string, patch: Partial<Item>) => void;
   onItemCommit: () => void;
@@ -126,7 +128,7 @@ export function Stage({
     if (!background) return;
     ctx.setTransform(v.scale, 0, 0, v.scale, v.ox, v.oy);
     boxes.current.clear();
-    drawComposition(ctx, { W, H, background, items, asset, foreground, boxes: boxes.current });
+    drawComposition(ctx, { W, H, background, items, asset, foreground, boxes: boxes.current, ...(cast ? { cast } : {}) });
     if (overlay) {
       ctx.globalAlpha = 0.5;
       ctx.drawImage(overlay, 0, 0, W, H);

@@ -77,6 +77,6 @@ export async function composeVariant(
   const c = newCanvas(Math.round(W * s), Math.round(H * s));
   const ctx = c.getContext("2d")!;
   ctx.scale(s, s);
-  drawComposition(ctx, { W, H, background, items: scene.items, asset: (it) => assets.get(it.uid), foreground: fg });
+  drawComposition(ctx, { W, H, background, items: scene.items, asset: (it) => assets.get(it.uid), foreground: fg, cast: scene.cast });
   return c;
 }
