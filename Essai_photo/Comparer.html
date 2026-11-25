@@ -1,0 +1,60 @@
+<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Essai sur votre ambiance</title><style>
+*{box-sizing:border-box}body{max-width:1180px;margin:32px auto;padding:0 22px;color:#342d27;background:#faf8f4;font:16px/1.5 system-ui}h1,h2,h3{font-family:Georgia,serif;font-weight:500}h3{font-size:18px;margin:18px 0 8px}figure{margin:0}img{display:block;width:100%;border-radius:8px}figcaption{margin:7px 0 18px;font-size:14px}.pair{display:grid;grid-template-columns:1fr 1fr;gap:16px}.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}p{max-width:84ch}a{color:#674335}.note{font-size:14px;color:#6b6058}table{border-collapse:collapse;margin:8px 0 18px;font-size:14px}td,th{border-bottom:1px solid #e3dcd2;padding:5px 10px;text-align:left}th{font-weight:600}.n{text-align:right}@media(max-width:800px){.trio{grid-template-columns:1fr}}@media(max-width:650px){.pair{grid-template-columns:1fr}}</style>
+<h1>Essai sur votre ambiance</h1>
+<p class="note">Toutes les images de cette page ont été produites sur ce PC par le logiciel livré (Studio Plan &amp; 3D et moteur photo local), sans connexion, sans clé API et sans coût par rendu. Les visuels de variantes sont les fichiers obtenus par le bouton « Visuel PNG » du studio. Les planches se régénèrent avec <code>runtime\windows\python.exe local\tests\essais_studio.py</code>.</p>
+
+<h2>1. Détourage d’un article du magasin : le fauteuil</h2>
+<p>Photo d’origine : l’extrait du fauteuil de droite (<a href="fauteuil-original.png">fauteuil-original.png</a>). Chaque ligne montre le même détourage sur fond clair puis sur fond sombre, pour juger les pieds fins, les jours entre l’accoudoir et l’assise, les bords du tissu et sa couleur.</p>
+<div class="trio">
+<figure><img src="fauteuil-v2-clair-ancien.png" alt="Ancien détourage sur fond clair"><figcaption><b>Avant</b> — ancien moteur : pieds fantômes, patins effacés, accoudoir gauche perdu</figcaption></figure>
+<figure><img src="fauteuil-v2-clair-auto.png" alt="Nouveau détourage automatique sur fond clair"><figcaption><b>Automatique</b> — pieds avant et arrière pleins, bords sans liseré de fond, couleur du tissu conservée</figcaption></figure>
+<figure><img src="fauteuil-v2-clair-corrige.png" alt="Détourage corrigé sur fond clair"><figcaption><b>Après retouche</b> dans le logiciel (zoom, « Restaurer précis » puis « Restaurer ») : accoudoir gauche et patin droit rétablis</figcaption></figure>
+<figure><img src="fauteuil-v2-sombre-ancien.png" alt="Ancien détourage sur fond sombre"><figcaption>Avant, fond sombre</figcaption></figure>
+<figure><img src="fauteuil-v2-sombre-auto.png" alt="Nouveau détourage automatique sur fond sombre"><figcaption>Automatique, fond sombre</figcaption></figure>
+<figure><img src="fauteuil-v2-sombre-corrige.png" alt="Détourage corrigé sur fond sombre"><figcaption>Après retouche, fond sombre · <a href="fauteuil-v2-corrige.png">PNG enregistré sur la fiche article</a></figcaption></figure>
+</div>
+<p class="note">Limites constatées : sur cette photo de 210 × 191 pixels, l’accoudoir gauche (bronze sur un sol sombre) et le patin droit ne sont pas retrouvés automatiquement ; il faut une minute de retouche au pinceau. Une petite tache d’ombre au sol reste sous le pied avant gauche (non retouchée ici) ; c’est le rôle du pinceau « Effacer » de l’éditeur. Le détourage retouché est enregistré sur la fiche article et réutilisé dans tous les projets.</p>
+
+<h2>2. Mur du fond : du orange au beige mat, lumière conservée</h2>
+<p>Dans le studio : « Nouveau mur », trois clics de baguette sur le mur du fond, puis un clic sur la teinte « Beige mat » de la bibliothèque. Les portes, l’horloge, le plafond, la plinthe et les meubles placés devant ne sont pas repeints. La couleur change ; l’éclairage de la photo est conservé.</p>
+<div class="pair"><figure><img src="rendu-de-reference.jpg" alt="Rendu de référence"><figcaption>Rendu de référence (cible visuelle)</figcaption></figure><figure><img src="studio-variante-a.jpg" alt="Variante A, mur du fond beige mat"><figcaption>Variante A : mur du fond « Beige mat » (EX-PEI-BEIGE), notre fauteuil et notre vase posés</figcaption></figure></div>
+<h3>Contours (agrandis ×3) : avant à gauche, après à droite</h3>
+<img src="mur-contours-zoom.png" alt="Zooms sur les contours du mur repeint" style="max-width:920px">
+<figcaption>Jonction avec le plafond · huisserie de porte · horloge et son ombre · plinthe et fauteuil existant devant le mur.</figcaption>
+<h3>Lumière</h3>
+<div class="pair"><figure><img src="mur-lumiere-avant.jpg" alt="Bande de mur avant"><figcaption>Avant</figcaption></figure><figure><img src="mur-lumiere-apres.jpg" alt="Bande de mur après"><figcaption>Après</figcaption></figure></div>
+<p>Luminance mesurée (échelle 0–255) : entre les deux portes, zone la plus éclairée, 153 avant et 218 après ; à droite de la porte, plus dans l’ombre, 122 avant et 177 après. La partie éclairée reste nettement plus claire (rapport 1,25 avant, 1,23 après) : pas d’aplat.</p>
+
+<h2>3. Variantes pour le rendez-vous client</h2>
+<p>La variante A a été dupliquée deux fois. Seule la finition du mur change ; le fauteuil et le vase restent exactement à leur place (mêmes coordonnées enregistrées).</p>
+<div class="trio">
+<figure><img src="studio-variante-a.jpg" alt="Variante A beige"><figcaption>A — Peinture « Beige mat »</figcaption></figure>
+<figure><img src="studio-variante-b.jpg" alt="Variante B sauge"><figcaption>B — Peinture « Sauge » (un clic)</figcaption></figure>
+<figure><img src="studio-variante-c.jpg" alt="Variante C papier peint"><figcaption>C — Papier peint « Feuillage » aligné sur la perspective (4 coins)</figcaption></figure>
+</div>
+<p>Dans ces visuels : notre fauteuil « Fauteuil tweed piétement métal » (MOB-MET-010) est posé côté lumière, ses pieds sur le sol, et passe derrière le tabouret et le vase existants (premier plan) ; notre vase (DEC-GRE-003) est posé sur le plateau du tabouret de droite avec l’outil « Poser sur un support ». Liste exportée par le studio pour la variante A :</p>
+<table><thead><tr><th>Type</th><th>Référence</th><th>Désignation</th><th class="n">Qté</th><th class="n">Prix TTC</th></tr></thead><tbody>
+<tr><td>Article</td><td>MOB-MET-010</td><td>Fauteuil tweed piétement métal</td><td class="n">1</td><td class="n">690,00 €</td></tr>
+<tr><td>Article</td><td>DEC-GRE-003</td><td>Vase en grès émaillé terracotta</td><td class="n">1</td><td class="n">59,00 €</td></tr>
+<tr><td>Peinture</td><td>EX-PEI-BEIGE</td><td>Beige mat (exemple) (#D8C7AE)</td><td class="n">1</td><td class="n">—</td></tr>
+</tbody></table>
+<p class="note">Limites constatées : l’ombre de contact est une ombre douce réglable (intensité, douceur, étendue), pas une ombre calculée depuis les fenêtres du rendu. L’éclairage des articles n’est pas recalculé : choisir une photo d’article prise sous une lumière proche de celle de la pièce. La gomme sur un arrière-plan chargé (porte à lettres, plaid, autre fauteuil) donne un résultat médiocre : nous l’avons écartée de cette démonstration.</p>
+
+<h2>4. Outils photo des versions précédentes</h2>
+<h3>Gomme : effacer un meuble</h3>
+<div class="trio">
+<figure><img src="gomme-fauteuil-masque.jpg" alt="Zone peinte sur le fauteuil"><figcaption>Zone peinte</figcaption></figure>
+<figure><img src="gomme-fauteuil-telea.jpg" alt="Ancienne gomme par diffusion"><figcaption>Ancienne gomme (diffusion)</figcaption></figure>
+<figure><img src="gomme-fauteuil.jpg" alt="Gomme par recopie de motifs"><figcaption>Gomme actuelle (recopie de motifs)</figcaption></figure>
+</div>
+<p class="note">Efficace sur un sol ou un mur simple ; sur un fond chargé, des fragments (lettres, tissus) peuvent être recopiés. Effacer un meuble à la fois.</p>
+<h3>Remplacer le décor</h3>
+<div class="trio">
+<figure><img src="decor-traits.jpg" alt="Meubles peints au pinceau"><figcaption>Meubles à garder</figcaption></figure>
+<figure><img src="decor-sauge-parquet.jpg" alt="Mur sauge et parquet chêne"><figcaption>Mur sauge, parquet chêne</figcaption></figure>
+<figure><img src="decor-lin-beton.jpg" alt="Mur lin et béton ciré"><figcaption>Mur lin, béton ciré</figcaption></figure>
+</div>
+
+<h2>Rendu de référence et ce qui reste différent</h2>
+<p>Le rendu de référence a été produit par un modèle génératif qui recalcule la lumière, les reflets du sol et les ombres de toute la scène. Le studio local conserve au contraire le rendu ou la photo d’origine (cadrage et lumière) et y applique les finitions et les articles réels du magasin. C’est plus fidèle aux références vendues, mais les ombres portées et la lumière sur les articles ajoutés restent plus simples que dans un rendu génératif.</p>
+</html>

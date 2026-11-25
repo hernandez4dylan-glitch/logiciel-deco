@@ -1,0 +1,18 @@
+# Dépendances et compilation (recréées par npm ci / npm run build)
+node_modules/
+dist/
+
+# Python embarqué et bibliothèques tierces (≈ 160 Mo) : livrés dans le ZIP Windows
+runtime/
+
+# Livrables et fichiers temporaires
+*.zip
+__pycache__/
+*.pyc
+.claude/hooks/compteur.txt
+
+# Données de boutique : ne jamais les versionner (elles vivent dans %LOCALAPPDATA%)
+*.sqlite3
+*.sqlite3-journal
+.env
+.env.*

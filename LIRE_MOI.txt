@@ -1,0 +1,119 @@
+ATELIER STOCK SYMPHONY — ÉDITION LOCALE WINDOWS x64
+
+Démarrer
+1. Dans l’Explorateur Windows, utilisez « Extraire tout » sur le ZIP.
+2. Ouvrez le dossier extrait et double-cliquez sur Lancer_Atelier.cmd.
+3. Laissez la petite fenêtre du lanceur ouverte pendant le travail.
+   Le logiciel ouvre une fenêtre Edge ou votre navigateur habituel.
+   L’adresse locale affichée par le lanceur reste utilisable.
+4. Pour arrêter, fermez la fenêtre du logiciel puis celle du lanceur.
+
+Le programme, Python, SQLite, les polices, le moteur photo et son modèle sont
+inclus. Aucune inscription, installation npm ou clé API à saisir sur le PC.
+Ce logiciel est prévu pour un utilisateur sur un PC Windows 10/11 x64.
+Les modèles et les images sont traités sur le poste.
+
+Données et sauvegarde
+Les six produits du projet d’origine et les autres exemples permettent de
+tester la boutique. Vos anciennes données en ligne devront être importées
+depuis un export de cette base. N’intégrez pas les chiffres d’exemple dans
+une comptabilité réelle.
+La base et les images ajoutées sont dans %LOCALAPPDATA%\AtelierStockSymphony.
+Le bouton « Sauvegarder la boutique » télécharge une copie au format ZIP.
+Pour restaurer, fermez le lanceur, conservez une copie du dossier existant,
+puis remplacez boutique.sqlite3 et le dossier photos par ceux de la sauvegarde.
+Les projets du studio (images, sélections de murs, articles, variantes) sont
+enregistrés automatiquement dans ce même dossier et font partie de la sauvegarde.
+Avant une mise à jour, faites une sauvegarde vérifiée (le logiciel fermé) :
+  runtime\windows\python.exe local\outils\sauvegarde.py
+Elle copie la base (en lecture seule) et les photos dans
+%LOCALAPPDATA%\AtelierStockSymphony_sauvegardes\<date-heure>, contrôle l'intégrité
+et confirme que l'original n'a pas changé (message « SAUVEGARDE VALIDÉE »).
+local\outils\impact_migration.py <copie de boutique.sqlite3> montre sur une copie
+ce que la nouvelle version ajoutera à la base, sans toucher à l'original.
+Au premier lancement de cette version, la base existante reçoit de nouvelles
+tables (teintes et matières, photos d’article, projets) : le catalogue, les
+ventes, les dépenses et les photos déjà enregistrés ne sont pas modifiés.
+
+Gérer la boutique
+Dans « Catalogue & Stock », le crayon modifie un article (prix, fournisseur,
+photo…) et la corbeille le supprime après confirmation ; le stock se règle
+avec −1 / +1. Dans « Devis & Ventes », l’historique permet de corriger le nom
+du client ou d’annuler une vente : les articles sont alors remis en stock.
+Dans « Frais & Dépenses », chaque dépense se modifie ou se supprime.
+Les boutons « Export Excel / CSV » produisent des fichiers lisibles par Excel.
+
+Photos et détourage des articles
+Dans « Catalogue & Stock », l’appareil photo d’une ligne ouvre « Photos &
+détourage » : ajoutez plusieurs vues d’un même article, puis « Détourer ».
+L’éditeur permet de zoomer (molette, boutons), de déplacer la vue (clic droit
+maintenu ou outil main), d’effacer un reste de fond, de « Restaurer » des pixels
+de la photo, ou de « Restaurer précis » (ne reprend que ce qui se distingue du
+fond : un trait large sur un pied fin suffit). Vérifiez sur fond clair puis sur
+fond sombre, puis « Enregistrer le détourage » : il est rangé sur la fiche
+article et réutilisé dans tous les projets.
+
+Studio Plan & 3D (rendez-vous client)
+Ouvrez « Espace Pro Décorateurs », puis « Studio Plan & 3D ».
+1. « Nouveau projet » : nom, client, et le rendu 3D de l’architecte ou la photo
+   de la pièce. Le format est conservé (panoramique, vertical) ; l’image est
+   seulement réduite à 2400 pixels sur le grand côté. Sans image, une pièce
+   vierge est générée.
+2. Onglet « Murs » : « Nouveau mur », puis la baguette : un clic sur le mur le
+   sélectionne jusqu’aux arêtes, cadres et plinthes (cliquez plusieurs fois si
+   la lumière varie beaucoup). « Ajouter » et « Protéger » corrigent au pinceau
+   (fenêtre, plinthe, meuble devant le mur) ; « Affiner les bords » recale le
+   contour sur la photo. Un clic sur une teinte de la bibliothèque l’applique :
+   la lumière de la pièce est conservée (côté fenêtre plus clair). Pour un papier
+   peint, réglez la taille du motif et « Aligner sur la perspective » (glissez
+   les 4 coins sur les angles du mur). Un enduit utilise la photo d’échantillon.
+   « Ajouter » dans la bibliothèque enregistre une teinte ou une matière avec son
+   nom, sa référence magasin, sa couleur, son motif ou sa photo d’échantillon.
+   La « Pipette » prélève une couleur sur la photo (coussin, tissu, échantillon)
+   et l’applique au mur ; « Enregistrer cette teinte » lui donne une référence.
+3. Onglet « Articles » : cliquez un article du catalogue, glissez-le par sa base
+   (le point rond = les pieds), réglez la taille avec la poignée carrée ou le
+   curseur. « Poser sur un support » puis un clic sur le sol ou le plateau d’une
+   console y pose exactement la base de l’article. Ombre de contact réglable
+   (intensité, douceur, étendue), miroir, inclinaison, angle de vue si l’article
+   a plusieurs photos. « Premier plan existant » : sélectionnez à la baguette ou
+   au pinceau un meuble de la photo ; les articles « Passe derrière le premier
+   plan » sont alors masqués par lui.
+4. Onglet « Photo » : gomme (un objet à la fois, sur un fond simple) et
+   remplacement du décor. « Annuler la dernière retouche » revient d’une étape
+   (photo, surfaces et premier plan) ; « Revenir à l’image importée » les annule toutes.
+5. Variantes : « Dupliquer la variante » puis changez une seule chose (par
+   exemple la teinte du mur, en un clic) ; les articles restent à leur place.
+   « Comparer » affiche deux variantes en rideau ou côte à côte avec leurs listes.
+6. Remise au client : « Visuel PNG » (pleine résolution), « Fiche client (PDF) »
+   (visuel, références, quantités, finitions ; choisissez « Enregistrer au format
+   PDF » dans la fenêtre d’impression), « Références (CSV) » pour Excel.
+   Le tarif Public ou Pro se choisit dans la liste chiffrée.
+Tout est enregistré automatiquement (« Enregistré » en haut à droite) : fermez
+le logiciel et rouvrez le projet dans la liste pour reprendre.
+Limites : les ombres sont des ombres de contact douces, pas un calcul de la
+lumière des fenêtres ; la lumière des articles ajoutés n’est pas recalculée ;
+le rééclairage complet d’un rendu génératif n’est pas réalisé. Chaque calcul
+(baguette, finitions) prend de 1 à 5 secondes sur un PC de bureau.
+Dans « Catalogue & Stock », « Retouche showroom » prépare une photo d’annonce :
+détourage, correction automatique de la lumière, fond uni ou décor clair avec
+ombre au sol. Le tableau de bord suit les ventes enregistrées chaque semaine
+(cap de la boutique, voir docs\cap-et-feuille-de-route.md). Le conseiller classe les articles selon le budget et la description.
+Ouvrez Essai_photo\Comparer.html pour voir les essais réalisés avec le logiciel.
+
+Modifier le logiciel
+src contient les écrans React, local contient le serveur, le moteur photo
+et le schéma SQLite. dist contient l’interface compilée. Pour recompiler après
+modification des écrans, installez Node.js, puis lancez npm ci et npm run build
+depuis le dossier de cette édition. Relancez ensuite Lancer_Atelier.cmd.
+Les ressources de compilation se téléchargent lors de npm ci.
+Vérifications : npm run check (TypeScript), npm test (tests des écrans),
+npm run test:local (tests du serveur, de la base et du moteur photo, avec le
+Python inclus ; ils utilisent un dossier temporaire, jamais vos données).
+runtime\windows\python.exe local\tests\essais_photo.py et essais_studio.py
+régénèrent les images de Essai_photo. Le moteur photo est dans local\photo.py
+(point d’entrée), local\detourage.py (détourage), local\finitions.py (murs),
+local\gomme.py (effacement) et local\retouche.py (décor). Le studio est dans
+src\components\studio et src\lib (scene.ts, render-scene.ts, compose.ts).
+Pour essayer le serveur sur des données de test, définissez ATELIER_DATA vers
+un dossier vide avant de lancer runtime\windows\python.exe local\server.py.
