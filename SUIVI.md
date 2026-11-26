@@ -108,6 +108,17 @@ local ; propositions avec nos finitions dès l'import ; « Optimisation finale �
   ne touche jamais l'intérieur des articles ; la 2e pièce d'essai est une image de synthèse (aucune autre photo
   de pièce n'était disponible) : à confirmer sur vos photos réelles, le logiciel affiche les durées.
 
+## Simplification (26/11/2026)
+Demande : les 4 propositions ne servent à rien et font perdre du temps ; la sélection des murs est trop compliquée.
+- [x] Bandeau des propositions retiré (code supprimé).
+- [x] Peindre : choisir la teinte puis cliquer sur la photo ; la surface reconnue sous le clic est peinte (porte
+  avant mur), sinon sélection à la baguette au point cliqué ; pipette = nouvelle teinte au pinceau.
+- [x] Meubles : choisir l'article puis cliquer sur la photo pour poser sa base.
+- [x] « Exporter pour l'IA » : visuel PNG + consigne de rendu 3D (modifiable, mémorisée) avec les finitions
+  utilisées ; l'optimisation locale reste accessible depuis cette fenêtre.
+- Vérifié dans le navigateur sur données de test : 2 clics = 2 murs peints, vase posé d'un clic sur un tabouret,
+  fenêtre d'export (aperçu, PNG, consigne).
+
 ## Tâches
 - [x] Vérification automatique installée (.claude/hooks/verifier.ps1 + .claude/settings.json)
 - [x] Base : migrations sans perte (teintes/matières, photos d'article, projets, variantes) + tests

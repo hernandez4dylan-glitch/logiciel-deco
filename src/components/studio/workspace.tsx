@@ -15,10 +15,10 @@ import type { StudioRows } from "@/lib/records";
 import { cutByMask, maskBounds, maskFromImage, newCanvas, strokeMask, tinted } from "@/lib/mask-canvas";
 import { drawComposition, type ItemAsset } from "@/lib/render-scene";
 import { finishPayload, itemImagePath, loadAsset, renderFinished } from "@/lib/compose";
-import { defaultQuad, floorQuad, itemBox, surfaceLabel, parseScene, popHistory, pushHistory, serializeScene, type CastShadow, type Item, type Point, type Quad, type Scene, type Surface, type Zone, type AnalyseInfo, compositionKey } from "@/lib/scene";
-import { snapshotDe, type Proposition } from "@/lib/propositions";
-import { Propositions } from "@/components/studio/propositions";
+import { defaultQuad, floorQuad, itemBox, surfaceLabel, parseScene, popHistory, pushHistory, serializeScene, type CastShadow, type Item, type Point, type Quad, type Scene, type Surface, type Zone, type AnalyseInfo, compositionKey, aspectLabel, zoneAspect } from "@/lib/scene";
 import { OptimisationDialog } from "@/components/studio/optimisation-dialog";
+import { ExportIaDialog } from "@/components/studio/export-ia-dialog";
+import { snapshotDe } from "@/lib/propositions";
 import { accordLight, stats as lumStats, UndoStack } from "@/lib/lumiere";
 import { sampleColor } from "@/lib/couleur";
 import { canvasToBlob, canvasToDataUrl, loadImage, pathToDataUrl, photoEngine, photoJson, photoUrl, uploadBlob } from "@/lib/studio-api";
@@ -53,7 +53,9 @@ export type WorkspaceApi = {
   applyFinish: (f: Finish) => void;
   /** Pose une finition sur plusieurs surfaces d'un coup (« Tous les murs »). */
   applyFinishTo: (f: Finish, zoneIds: string[]) => void;
-  applyProposition: (p: Proposition) => void;
+  /** Teinte « au pinceau » : un clic sur la photo la pose sur la surface visée. */
+  pinceau: Finish | null;
+  choisirPinceau: (f: Finish | null) => void;
   analyse: AnalyseInfo | null;
   analysing: boolean;
   reanalyse: () => void;
@@ -131,6 +133,8 @@ export function Workspace({
   /** Ouverture de la photo : point de départ de la mesure « premier aperçu ». */
   const debut = useRef(performance.now());
   const [optimOuvert, setOptimOuvert] = useState(false);
+  const [exportOuvert, setExportOuvert] = useState(false);
+  const [pinceau, setPinceau] = useState<Finish | null>(null);
   const dirty = useRef(false);
   const saving = useRef(false);
   const again = useRef(false);
@@ -393,7 +397,68 @@ export function Workspace({
     schedule();
   }
 
+  /** Surface de la photo sous le point cliqué : la plus « petite » d'abord (une porte
+   *  avant le mur qui l'entoure). */
+  function surfaceSous(p: Point): Zone | null {
+    const ordre: Surface[] = ["porte", "cadre", "autre", "mur", "plafond", "sol"];
+    let meilleure: Zone | null = null;
+    for (const z of sceneRef.current.zones) {
+      const m = masks.current.get(z.id);
+      if (!m || !z.visible) continue;
+      const a = m.getContext("2d", { willReadFrequently: true })!.getImageData(Math.round(p[0]), Math.round(p[1]), 1, 1).data[3]!;
+      if (a < 128) continue;
+      if (!meilleure || ordre.indexOf(z.surface) < ordre.indexOf(meilleure.surface)) meilleure = z;
+    }
+    return meilleure;
+  }
+
+  /** Sélection à la baguette autour d'un point, ajoutée au masque « key ». */
+  async function selectionAuPoint(p: Point, key: string) {
+    const plus = newCanvas(W, H);
+    const pc = plus.getContext("2d")!;
+    pc.fillStyle = "#fff";
+    pc.beginPath();
+    pc.arc(p[0], p[1], Math.max(4, Math.max(W, H) / 250), 0, Math.PI * 2);
+    pc.fill();
+    const fields: Record<string, unknown> = { image: await pathToDataUrl(basePathRef.current), mode: "select", plus: await canvasToDataUrl(plus), tolerance };
+    const n = moins.current.get(key);
+    if (n) fields["moins"] = await canvasToDataUrl(n);
+    const res = await loadImage(URL.createObjectURL(await photoEngine(fields)));
+    pushUndo(key);
+    getMask(key).getContext("2d")!.drawImage(maskFromImage(res, W, H, true), 0, 0);
+    commits.current.set(key, (commits.current.get(key) ?? 0) + 1);
+    dirtyMasks.current.add(key);
+    setCommitTick((t) => t + 1);
+    schedule();
+  }
+
   async function onClickImage(p: Point) {
+    if (tool === "peindre" && pinceau) {
+      const zone = surfaceSous(p);
+      if (zone) {
+        api.applyFinishTo(pinceau, [zone.id]);
+        setActiveZoneId(zone.id);
+        setTool("peindre");
+        return;
+      }
+      // Surface non reconnue : sélection à la baguette au point cliqué, puis peinture.
+      setBusy("Sélection de la surface…");
+      try {
+        const id = crypto.randomUUID();
+        const surface: Surface = pinceau.usage && pinceau.usage !== "autre" ? pinceau.usage : "mur";
+        masks.current.set(id, newCanvas(W, H));
+        await selectionAuPoint(p, id);
+        const n = sceneRef.current.zones.filter((z) => z.surface === surface).length + 1;
+        const zone: Zone = { id, name: `${surfaceLabel(surface).split(" ")[0]} ${n}`, mask: null, finish: null, quad: null, repetitions: 4, lumiere: 1, visible: true, surface, aspect: null, auto: false };
+        setScene((s) => ({ ...s, zones: [...s.zones, { ...zone, ...patchFinition(zone, pinceau) }] }));
+        setActiveZoneId(id);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Sélection impossible");
+      } finally {
+        setBusy(null);
+      }
+      return;
+    }
     if (tool === "mur-clic" || tool === "pp-clic") {
       const key = tool === "pp-clic" ? "fg" : activeZoneId;
       if (!key) {
@@ -436,15 +501,12 @@ export function Workspace({
       const hex = sampleColor({ data: d.data, width: W, height: H }, p[0], p[1], Math.max(2, Math.round(Math.max(W, H) / 600)));
       setTool("deplacer");
       if (!hex) return;
-      const zone = sceneRef.current.zones.find((z) => z.id === activeZoneId);
-      if (!zone) {
-        toast.info(`Teinte prélevée ${hex} : créez ou choisissez un mur pour l'appliquer`);
-        return;
-      }
-      api.updateZone(zone.id, {
-        finish: { id: null, kind: "peinture", name: `Teinte prélevée ${hex}`, reference: null, color: hex, texture: null, marque: null, gamme: null, finition: null },
+      // La couleur prélevée devient le pinceau : un clic sur la photo la pose.
+      api.choisirPinceau({
+        id: "", kind: "peinture", name: `Couleur prélevée ${hex}`, reference: null, color: hex, texture_path: null, motif_cm: null,
+        finition: null, marque: null, gamme: null, usage: null, created_at: "", updated_at: "",
       });
-      toast.success(`Teinte ${hex} appliquée sur « ${zone.name} » — enregistrez-la dans la bibliothèque pour lui donner une référence`);
+      toast.success(`Couleur ${hex} prise : cliquez sur la surface à peindre`);
     } else if (tool === "poser" && selectedUid) {
       // La base de l'article (pieds, socle) vient se poser exactement sur le point cliqué.
       updateItem(selectedUid, { x: p[0] / W, y: p[1] / H });
@@ -537,15 +599,6 @@ export function Workspace({
     }
   }
 
-  const premierApercu = useCallback(() => {
-    if (sceneRef.current.analyse && sceneRef.current.analyse.apercu === null) {
-      const sec = Math.round((performance.now() - debut.current) / 100) / 10;
-      sceneRef.current = { ...sceneRef.current, analyse: { ...sceneRef.current.analyse, apercu: sec } };
-      setSceneState(sceneRef.current);
-      dirty.current = true;
-      schedule();
-    }
-  }, [schedule]);
 
   // ------------------------------------------------------------ API des panneaux
   const api: WorkspaceApi = {
@@ -593,15 +646,10 @@ export function Workspace({
       // On quitte la sélection pour voir le rendu sans la surbrillance verte.
       if (tool === "mur-clic" || tool === "mur-plus" || tool === "mur-moins") setTool("deplacer");
     },
-    applyProposition: (p) => {
-      setScene((s) => ({
-        ...s,
-        zones: s.zones.map((z) => {
-          const a = p.affectations.find((x) => x.zoneId === z.id);
-          return a ? { ...z, ...patchFinition(z, a.finish), visible: true } : z;
-        }),
-      }));
-      toast.success(`Proposition « ${p.titre} » appliquée — changez une teinte en un clic dans la bibliothèque`);
+    pinceau,
+    choisirPinceau: (f) => {
+      setPinceau(f);
+      setTool(f ? "peindre" : "deplacer");
     },
     analyse: scene.analyse,
     analysing,
@@ -704,7 +752,8 @@ export function Workspace({
         ],
       }));
       setSelectedUid(uid);
-      setTool("deplacer");
+      // Choisir l'article puis cliquer sur la photo : sa base se pose au point cliqué.
+      setTool("poser");
     },
     updateItem,
     removeItem: (uid) => {
@@ -870,7 +919,9 @@ export function Workspace({
     busy ??
     (finishing
       ? "Application des finitions…"
-      : tool === "mur-clic"
+      : tool === "peindre" && pinceau
+        ? `Cliquez sur un mur, le plafond, le sol ou une porte : « ${pinceau.name} »`
+        : tool === "mur-clic"
         ? "Cliquez sur le mur à sélectionner"
         : tool === "mur-plus"
           ? "Peignez pour ajouter au mur"
@@ -944,36 +995,14 @@ export function Workspace({
             <Button
               size="sm"
               variant="hero"
-              disabled={!scene.items.length || !!busy || finishing}
-              title={scene.items.length ? "Retouche locale du montage validé (contours, grain, ombres des articles)" : "Placez d'abord un article"}
-              onClick={() => setOptimOuvert(true)}
+              disabled={!!busy || finishing}
+              title="Télécharger le visuel et la consigne à donner à une IA pour un rendu 3D"
+              onClick={() => setExportOuvert(true)}
             >
-              <Sparkles className="h-4 w-4" /> Optimisation finale
+              <Sparkles className="h-4 w-4" /> Exporter pour l'IA
             </Button>
           </div>
         </div>
-        <Propositions
-          zones={scene.zones}
-          finishes={finishes}
-          basePath={basePath}
-          W={W}
-          H={H}
-          mask={(id) => masks.current.get(id)}
-          zonesPour={(p) =>
-            scene.zones
-              .map((z) => {
-                const a = p.affectations.find((x) => x.zoneId === z.id);
-                return a ? { ...z, ...patchFinition(z, a.finish), visible: true } : z;
-              })
-              .filter((z) => z.finish && z.visible)
-          }
-          analyse={scene.analyse}
-          analysing={analysing}
-          onChoose={api.applyProposition}
-          onFirstPreview={premierApercu}
-          onReanalyse={api.reanalyse}
-          version={commitTick}
-        />
         <Stage
           ref={stage}
           W={W}
@@ -1014,6 +1043,18 @@ export function Workspace({
       <aside className="order-3 print:hidden">
         <PanelReferences api={api} discount={discount} />
       </aside>
+      <ExportIaDialog
+        open={exportOuvert}
+        onOpenChange={setExportOuvert}
+        montage={async () => (await calquesOptimisation()).montage}
+        nom={variant.name}
+        articles={scene.items.length}
+        details={scene.zones.filter((z) => z.finish && z.visible).map((z) => z.name + ' : ' + [z.finish!.marque, z.finish!.name].filter(Boolean).join(' ') + (z.finish!.kind === 'peinture' ? ', ' + aspectLabel(zoneAspect(z)).toLowerCase() : ''))}
+        onOptimiserIci={() => {
+          setExportOuvert(false);
+          setOptimOuvert(true);
+        }}
+      />
       <OptimisationDialog
         open={optimOuvert}
         onOpenChange={setOptimOuvert}

@@ -62,19 +62,16 @@ Ouvrez « Espace Pro Décorateurs », puis « Studio Plan & 3D ».
    seulement réduite à 2400 pixels sur le grand côté. Sans image, une pièce
    vierge est générée.
    Dès l'ouverture, l'IA locale reconnaît la pièce (une seule fois, 10 à 20 s) :
-   chaque pan de mur (mur gauche, mur du fond…), le plafond, le sol et les portes
-   deviennent des surfaces ; fenêtres, plinthes, tableaux et meubles sont exclus.
-   Le bandeau « Propositions pour cette pièce » montre alors 4 aperçus de VOTRE
-   pièce avec les finitions de la bibliothèque (par exemple une peinture sur tous
-   les murs, une chaux au fond, un papier peint au fond, un sol), la référence
-   sous chaque aperçu. Premier clic : choisir l'aperçu qui plaît. Les durées
-   « Analyse » et « premier aperçu » mesurées sur le PC s'affichent dans le bandeau.
-   Ensuite, comme dans la V1, « Appliquer sur : Tous les murs » est présélectionné :
-   un clic sur une teinte, une chaux ou un papier habille tous les murs en quelques
-   secondes, sans nouvelle analyse (une teinte prévue pour le sol, le plafond ou
-   les portes va sur ces surfaces). Choisissez une surface pour ne changer qu'elle.
-   La correction manuelle (baguette, pinceau) reste repliée sous « Corriger la
-   sélection » ; « Réanalyser » relance la reconnaissance.
+   chaque pan de mur, le plafond, le sol et les portes ; fenêtres, plinthes,
+   tableaux et meubles sont laissés de côté.
+   PEINDRE : onglet « Murs », 1. cliquez sur une teinte (ou une chaux, un papier
+   peint, un sol), 2. cliquez sur la photo : le mur, le plafond, le sol ou la
+   porte visé prend la teinte, lumière conservée. Chaque clic peint une surface ;
+   changez de teinte et cliquez ailleurs. « Tous les murs d'un coup » existe aussi.
+   « Prendre une couleur sur la photo » : la couleur prélevée devient le pinceau.
+   Si une surface n'a pas été reconnue, le clic la sélectionne à la baguette.
+   La surface peinte se règle ensuite (mat, velours, satiné, brillant, lumière,
+   taille du motif). La sélection à la main reste repliée en bas du panneau.
 2. Onglet « Murs » : « + Mur », « + Plafond », « + Porte », « + Sol » ou
    « + Autre » crée une surface de ce type, puis la baguette : un clic la
    sélectionne jusqu’aux arêtes, cadres et plinthes (cliquez plusieurs fois si
@@ -103,8 +100,9 @@ Ouvrez « Espace Pro Décorateurs », puis « Studio Plan & 3D ».
    La recherche et le filtre « marque » retrouvent une teinte dans la bibliothèque.
    La « Pipette » prélève une couleur sur la photo (coussin, tissu, échantillon)
    et l’applique au mur ; « Enregistrer cette teinte » lui donne une référence.
-3. Onglet « Articles » : cliquez un article du catalogue, glissez-le par sa base
-   (le point rond = les pieds), réglez la taille avec la poignée carrée ou le
+3. Onglet « Articles » : cliquez un article du catalogue, puis cliquez sur la
+   photo à l'endroit où poser sa base (sol, plateau d'une console). Glissez-le
+   ensuite par sa base si besoin (le point rond = les pieds), réglez la taille avec la poignée carrée ou le
    curseur. « Poser sur un support » puis un clic sur le sol ou le plateau d’une
    console y pose exactement la base de l’article. Ombre de contact réglable
    (intensité, douceur, étendue), miroir, inclinaison, angle de vue si l’article
@@ -118,14 +116,12 @@ Ouvrez « Espace Pro Décorateurs », puis « Studio Plan & 3D ».
 4. Onglet « Photo » : gomme (un objet à la fois, sur un fond simple) et
    remplacement du décor. « Annuler la dernière retouche » revient d’une étape
    (photo, surfaces et premier plan) ; « Revenir à l’image importée » les annule toutes.
-   « Optimisation finale » (au-dessus de l'image, une fois la composition validée) :
-   retouche par l'IA générative locale avec la consigne enregistrée (rien à
-   écrire), limitée aux contours et aux ombres de contact des articles ajoutés ;
-   le reste du montage, le cadrage, les finitions et l'intérieur des articles ne
-   changent pas. Compter 15 à 60 s par groupe d'articles sur un PC sans carte
-   graphique ; la durée s'affiche. Avant / après au rideau, puis « Garder le rendu
-   optimisé » (utilisé pour le visuel PNG et la fiche client tant que rien ne
-   change) ou « Revenir au montage ».
+   « Exporter pour l'IA » (au-dessus de l'image) : téléchargez le visuel en PNG
+   et copiez la consigne prête à l'emploi (rendu 3D photoréaliste, perspective,
+   finitions et articles conservés, finitions utilisées ajoutées). Joignez le
+   visuel dans votre IA d'images et collez la consigne. La consigne se modifie
+   dans la même fenêtre et reste mémorisée sur le PC. « Ou optimiser sur ce PC »
+   lance la retouche locale (contours et ombres des articles, 15 à 60 s).
    Modèles, licences et restrictions d'usage : local\modeles\LISEZ-MOI-MODELES.txt.
 5. Variantes : « Dupliquer la variante » puis changez une seule chose (par
    exemple la teinte du mur, en un clic) ; les articles restent à leur place.

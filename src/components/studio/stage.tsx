@@ -7,6 +7,7 @@ import { fitView, hitItem, toImage, zoomAt, type Box, type CastShadow, type Item
 
 export type StageTool =
   | "deplacer"
+  | "peindre"
   | "main"
   | "mur-clic"
   | "mur-plus"
@@ -209,7 +210,7 @@ export function Stage({
       onStroke(p, p, brush / v.scale);
       return;
     }
-    if (tool === "mur-clic" || tool === "pp-clic" || tool === "poser" || tool === "pipette") {
+    if (tool === "mur-clic" || tool === "pp-clic" || tool === "poser" || tool === "pipette" || tool === "peindre") {
       onClickImage(p);
       return;
     }
