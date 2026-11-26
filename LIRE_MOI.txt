@@ -8,8 +8,8 @@ Démarrer
    L’adresse locale affichée par le lanceur reste utilisable.
 4. Pour arrêter, fermez la fenêtre du logiciel puis celle du lanceur.
 
-Le programme, Python, SQLite, les polices, le moteur photo et son modèle sont
-inclus. Aucune inscription, installation npm ou clé API à saisir sur le PC.
+Le programme, Python, SQLite, les polices, le moteur photo et ses modèles d'IA
+(environ 4 Go, exécutés sur le processeur, sans Internet) sont inclus. Aucune inscription, installation npm ou clé API à saisir sur le PC.
 Ce logiciel est prévu pour un utilisateur sur un PC Windows 10/11 x64.
 Les modèles et les images sont traités sur le poste.
 
@@ -61,6 +61,20 @@ Ouvrez « Espace Pro Décorateurs », puis « Studio Plan & 3D ».
    de la pièce. Le format est conservé (panoramique, vertical) ; l’image est
    seulement réduite à 2400 pixels sur le grand côté. Sans image, une pièce
    vierge est générée.
+   Dès l'ouverture, l'IA locale reconnaît la pièce (une seule fois, 10 à 20 s) :
+   chaque pan de mur (mur gauche, mur du fond…), le plafond, le sol et les portes
+   deviennent des surfaces ; fenêtres, plinthes, tableaux et meubles sont exclus.
+   Le bandeau « Propositions pour cette pièce » montre alors 4 aperçus de VOTRE
+   pièce avec les finitions de la bibliothèque (par exemple une peinture sur tous
+   les murs, une chaux au fond, un papier peint au fond, un sol), la référence
+   sous chaque aperçu. Premier clic : choisir l'aperçu qui plaît. Les durées
+   « Analyse » et « premier aperçu » mesurées sur le PC s'affichent dans le bandeau.
+   Ensuite, comme dans la V1, « Appliquer sur : Tous les murs » est présélectionné :
+   un clic sur une teinte, une chaux ou un papier habille tous les murs en quelques
+   secondes, sans nouvelle analyse (une teinte prévue pour le sol, le plafond ou
+   les portes va sur ces surfaces). Choisissez une surface pour ne changer qu'elle.
+   La correction manuelle (baguette, pinceau) reste repliée sous « Corriger la
+   sélection » ; « Réanalyser » relance la reconnaissance.
 2. Onglet « Murs » : « + Mur », « + Plafond », « + Porte », « + Sol » ou
    « + Autre » crée une surface de ce type, puis la baguette : un clic la
    sélectionne jusqu’aux arêtes, cadres et plinthes (cliquez plusieurs fois si
@@ -104,6 +118,15 @@ Ouvrez « Espace Pro Décorateurs », puis « Studio Plan & 3D ».
 4. Onglet « Photo » : gomme (un objet à la fois, sur un fond simple) et
    remplacement du décor. « Annuler la dernière retouche » revient d’une étape
    (photo, surfaces et premier plan) ; « Revenir à l’image importée » les annule toutes.
+   « Optimisation finale » (au-dessus de l'image, une fois la composition validée) :
+   retouche par l'IA générative locale avec la consigne enregistrée (rien à
+   écrire), limitée aux contours et aux ombres de contact des articles ajoutés ;
+   le reste du montage, le cadrage, les finitions et l'intérieur des articles ne
+   changent pas. Compter 15 à 60 s par groupe d'articles sur un PC sans carte
+   graphique ; la durée s'affiche. Avant / après au rideau, puis « Garder le rendu
+   optimisé » (utilisé pour le visuel PNG et la fiche client tant que rien ne
+   change) ou « Revenir au montage ».
+   Modèles, licences et restrictions d'usage : local\modeles\LISEZ-MOI-MODELES.txt.
 5. Variantes : « Dupliquer la variante » puis changez une seule chose (par
    exemple la teinte du mur, en un clic) ; les articles restent à leur place.
    « Comparer » affiche deux variantes en rideau ou côte à côte avec leurs listes.

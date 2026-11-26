@@ -78,6 +78,36 @@ papiers saisis comme des produits (marque, ex. un fournisseur), finitions mat / 
 - Aucune référence réelle de fournisseur n'a été inventée : les teintes livrées sont des exemples fictifs.
 - Limite : les reflets sont une approximation 2D (symétrie par rapport au pied de la surface), sans fenêtres hors champ.
 
+## IA locale : propositions dès l'import et optimisation finale (25-26/11/2026)
+Demande : retrouver la simplicité de la V1 (Murs présélectionnés, une teinte, Appliquer, l'IA trouve les murs) en
+local ; propositions avec nos finitions dès l'import ; « Optimisation finale » avec consigne enregistrée.
+- V1 relue (src/components/pro/studio.tsx, src/routes/api/showroom-photo.ts) : envoi de la photo et d'une consigne
+  « repeins uniquement les murs » à un modèle d'édition en ligne (Lovable). Remplacé par des modèles locaux.
+- Modèles retenus (licences vérifiées sur les fiches officielles, usage commercial et inclusion dans le ZIP permis) :
+  UperNet ConvNeXt-Small ADE20K (MIT), Depth Anything V2 Small (Apache 2.0), SD 1.5 Inpainting (OpenRAIL-M)
+  + LCM-LoRA (OpenRAIL++-M) fusionnés, TAESD (MIT), onnxruntime 1.20.1 (MIT). Textes et restrictions d'usage
+  dans local/modeles. Matériel d'essai : Intel Core i5-13400T, 16 Go, sans carte graphique dédiée.
+- [x] Analyse automatique à l'import (local/analyse.py) : pans de mur par la profondeur (profil par morceaux,
+  angle recalé sur l'arête visible), plafond, sol, portes ; fenêtres, tableaux, meubles, plinthes exclus.
+- [x] Propositions (src/lib/propositions.ts) : 4 aperçus de la pièce avec les finitions réelles de la bibliothèque,
+  référence sous chaque aperçu ; un clic applique ; « Tous les murs » présélectionné ; changement de finition
+  sans nouvelle analyse (lumière de chaque surface gardée en cache).
+- [x] Optimisation finale (local/optimisation.py) : consigne pré-encodée, retouche limitée à un anneau autour des
+  articles et à leurs ombres, grain du montage réinjecté ; avant/après, « Garder » / « Revenir au montage ».
+- Mesures dans le logiciel (navigateur, données d'essai) : hall de référence — analyse 16,7 s, premier aperçu 22 s ;
+  salon en angle — analyse 10,6 s, premier aperçu 12,6 s, 4 aperçus 15 s ; changement de proposition ou passage à
+  la chaux sur tous les murs ≈ 4 s ; optimisation : 14 s (petit vase, vignette 384 px) à 43 s (vignette 512 px),
+  dont ≈ 10 s de chargement du modèle au premier usage.
+- Approches abandonnées : quantification int8 de l'UNet (10 s par pas contre 10,9 : gain nul, qualité moindre) ;
+  VAE d'origine (40 s par vignette) remplacé par TAESD (3 s) ; découpage des pans par programmation dynamique
+  (cassures absentes) remplacé par recherche exhaustive ; croissance libre de la couleur du mur (débordait dans
+  le plafond) remplacée par une extension limitée aux pixels classés « objet ».
+- Bug antérieur corrigé : un POST refusé (403) coupait la connexion sous Windows avant la réponse (corps non lu).
+- Limites : la segmentation est calculée en 576 px (bords recalés ensuite) ; sur une image dessinée sans ombres, un
+  coin de plafond uni peut rester compté comme mur ; l'optimisation ne recrée pas la lumière de toute la scène et
+  ne touche jamais l'intérieur des articles ; la 2e pièce d'essai est une image de synthèse (aucune autre photo
+  de pièce n'était disponible) : à confirmer sur vos photos réelles, le logiciel affiche les durées.
+
 ## Tâches
 - [x] Vérification automatique installée (.claude/hooks/verifier.ps1 + .claude/settings.json)
 - [x] Base : migrations sans perte (teintes/matières, photos d'article, projets, variantes) + tests

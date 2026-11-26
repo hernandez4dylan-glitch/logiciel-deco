@@ -1,0 +1,17 @@
+Recréer les modèles d'IA de local\modeles (poste de développement uniquement)
+
+Les fichiers ONNX (≈ 4 Go) sont livrés dans le ZIP Windows mais pas dans le dépôt GitHub.
+Pour les régénérer (Python 3.12 avec torch 2.5.1 CPU, transformers 4.46.3, diffusers 0.31.0,
+peft 0.13.2, onnx 1.17.0, onnxruntime 1.20.1), dans un dossier de travail au chemin court :
+1. Télécharger depuis Hugging Face (snapshot_download) dans des sous-dossiers :
+   seg   <- openmmlab/upernet-convnext-small                         (MIT)
+   depth <- depth-anything/Depth-Anything-V2-Small-hf                (Apache 2.0)
+   sd    <- stable-diffusion-v1-5/stable-diffusion-inpainting, variante fp16 (CreativeML OpenRAIL-M)
+   lcm   <- latent-consistency/lcm-lora-sdv1-5                       (OpenRAIL++-M)
+   taesd <- madebyollin/taesd                                        (MIT)
+2. python export_analyse.py   -> onnx/piece_segmentation.onnx, piece_profondeur.onnx, ade20k_labels.json
+   python export_sd.py        -> onnx/sd_unet.onnx(+.data), consigne.npz, consigne.json
+   python export_taesd.py     -> onnx/taesd_encodeur.onnx, taesd_decodeur.onnx
+3. Copier ces fichiers dans local\modeles.
+La consigne d'optimisation (traduite en anglais pour le modèle) est dans export_sd.py.
+onnxruntime s'installe dans runtime\windows\packages (wheel cp313 win_amd64, sans dépendances).

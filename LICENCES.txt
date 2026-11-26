@@ -8,7 +8,19 @@ La gomme (local/gomme.py), le remplacement du décor (local/retouche.py), le dé
 Ils appliquent des méthodes publiées (remplissage par exemplaires de Criminisi, Pérez et Toyama, 2004 ;
 GrabCut de Rother, Kolmogorov et Blake, 2004, et détecteur de contours de Sobel, fournis par OpenCV ;
 filtre guidé de He, Sun et Tang, 2010) avec NumPy, OpenCV et le modèle U²-Net déjà inclus : aucun code,
-modèle ni bibliothèque supplémentaire n'est embarqué.
+modèle ni bibliothèque supplémentaire n'est embarqué pour ces fonctions.
+
+IA locale (analyse de la pièce et « Optimisation finale ») — détail, conditions et restrictions
+d'usage dans local/modeles/LISEZ-MOI-MODELES.txt ; textes complets dans local/modeles/licences :
+- UperNet ConvNeXt-Small ADE20K (openmmlab, licence MIT) — reconnaissance des murs, sol, plafond…
+- Depth Anything V2 Small (licence Apache 2.0) — profondeur, séparation des pans de mur.
+- Stable Diffusion 1.5 Inpainting (CreativeML OpenRAIL-M) avec LCM-LoRA SD 1.5 fusionné
+  (CreativeML OpenRAIL++-M) — fichiers modifiés : fusion et conversion ONNX pour ce logiciel.
+  Usage commercial autorisé, sous réserve des restrictions d'usage de l'annexe A, qui s'imposent
+  à tout utilisateur du logiciel.
+- TAESD (madebyollin, licence MIT) — auto-encodeur compact.
+- onnxruntime 1.20.1 (Microsoft, licence MIT), dans runtime/windows/packages.
+Le code qui les exécute (local/analyse.py, local/optimisation.py) est écrit pour ce logiciel.
 Les motifs d'exemple public/images/motifs/feuillage.png, enduit-taloche.jpg et parquet-chene.jpg sont générés par
 local/tests/generer_motifs.py pour ce logiciel (aucune image tierce).
 

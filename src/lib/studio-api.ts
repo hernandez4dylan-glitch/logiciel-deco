@@ -84,3 +84,22 @@ export async function normalizeBase(src: string, maxSide = 2400) {
   ctx.drawImage(img, 0, 0, c.width, c.height);
   return { canvas: c, width: c.width, height: c.height };
 }
+
+/** Appel au moteur photo local pour les traitements qui renvoient des données
+ *  (analyse de la pièce, optimisation finale) plutôt qu'une image. */
+export async function photoJson<T>(fields: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
+  const res = await fetch("/api/photo", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fields),
+    signal: signal ?? null,
+  });
+  let body: { data?: T; error?: { message?: string } | null } = {};
+  try {
+    body = await res.json();
+  } catch {
+    /* réponse non JSON */
+  }
+  if (!res.ok || !body.data) throw new Error(body.error?.message || "Traitement impossible");
+  return body.data;
+}

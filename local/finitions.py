@@ -275,6 +275,28 @@ def _flou(x, sigma):
     return cv2.GaussianBlur(x, (0, 0), max(0.5, float(sigma)))
 
 
+_CACHE_LUMIERE = {}
+_ORDRE_CACHE = []
+
+
+def lumiere_en_cache(lin, m):
+    """La lumière d'une surface ne dépend que de la photo et de la sélection : on la
+    garde en mémoire, et changer de peinture, de chaux ou de papier sur la même surface
+    ne la recalcule pas (aperçus et variantes immédiats)."""
+    import hashlib
+    h = hashlib.blake2b(digest_size=16)
+    h.update(np.ascontiguousarray(lin[::3, ::3]).tobytes())
+    h.update(np.ascontiguousarray(m).tobytes())
+    h.update(str(m.shape).encode())
+    k = h.hexdigest()
+    if k not in _CACHE_LUMIERE:
+        _CACHE_LUMIERE[k] = decomposer_lumiere(lin, m)
+        _ORDRE_CACHE.append(k)
+        while len(_ORDRE_CACHE) > 24:
+            _CACHE_LUMIERE.pop(_ORDRE_CACHE.pop(0), None)
+    return _CACHE_LUMIERE[k]
+
+
 def decomposer_lumiere(lin, m):
     """Lumière d'une surface déduite de la photo : renvoie (couleur de la lumière RGB,
     éclairage lissé, micro-relief, albédo d'origine estimé)."""
@@ -386,7 +408,7 @@ def rendre_surface(lin, m, albedo, finition='mat', lumiere=1.0, relief_origine=1
     f['relief'] *= relief_origine
     for k in ('spec', 'voile', 'miroir'):
         f[k] *= lisse
-    C, base, detail, _ = decomposer_lumiere(lin, m)
+    C, base, detail, _ = lumiere_en_cache(lin, m)
     base = np.maximum(1 + (base - 1) * float(lumiere), 0.02)
     # Profondeur : les finitions brillantes saturent un peu la teinte et creusent les ombres.
     alb = albedo.astype(np.float32)

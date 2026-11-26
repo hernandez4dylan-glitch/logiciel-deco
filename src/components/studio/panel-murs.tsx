@@ -13,7 +13,7 @@ import type { WorkspaceApi } from "@/components/studio/workspace";
 import type { StageTool } from "@/components/studio/stage";
 
 const KINDS = ["peinture", "papier", "enduit"] as const;
-const TAB_LABEL: Record<(typeof KINDS)[number], string> = { peinture: "Peintures", papier: "Papiers & sols", enduit: "Enduits" };
+const TAB_LABEL: Record<(typeof KINDS)[number], string> = { peinture: "Peintures", papier: "Papiers & sols", enduit: "Chaux & enduits" };
 const AJOUTS: Surface[] = ["mur", "plafond", "porte", "sol", "autre"];
 const TOUTES = "toutes";
 
@@ -32,6 +32,18 @@ export function PanelMurs({ api }: { api: WorkspaceApi }) {
   const [recherche, setRecherche] = useState("");
   const [marque, setMarque] = useState(TOUTES);
   const [epaisseur, setEpaisseur] = useState(0.8);
+  /** Comme dans la V1 : « Murs » est présélectionné, un clic sur une teinte habille tous les murs. */
+  const [cible, setCible] = useState<"murs" | "active">("murs");
+  const murs = api.scene.zones.filter((zz) => zz.surface === "mur" && zz.visible !== false);
+  const appliquer = (f: (typeof api.finishes)[number]) => {
+    if (cible === "murs") {
+      // Une teinte prévue pour le sol, le plafond ou les portes va sur ces surfaces-là.
+      const surface = f.usage && f.usage !== "mur" && f.usage !== "autre" ? f.usage : "mur";
+      const ids = api.scene.zones.filter((zz) => zz.surface === surface).map((zz) => zz.id);
+      if (ids.length) return api.applyFinishTo(f, ids);
+    }
+    api.applyFinish(f);
+  };
   const z = api.activeZone;
   const tools: { id: StageTool; label: string; icon: typeof Wand2; hint: string }[] = [
     { id: "mur-clic", label: "Baguette", icon: Wand2, hint: "Cliquez sur la surface : sélection automatique jusqu'aux arêtes et menuiseries" },
@@ -109,7 +121,11 @@ export function PanelMurs({ api }: { api: WorkspaceApi }) {
               </SelectContent>
             </Select>
           </div>
-          <p className="text-xs font-medium text-muted-foreground">Sélection</p>
+          <details open={!z.auto} className="grid gap-2">
+          <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+            {z.auto ? "Corriger la sélection (facultatif — trouvée automatiquement)" : "Sélection"}
+          </summary>
+          <div className="mt-2 grid gap-2">
           <div className="grid grid-cols-3 gap-1">
             {tools.map((t) => (
               <Button key={t.id} size="sm" variant={api.tool === t.id ? "default" : "outline"} title={t.hint} aria-pressed={api.tool === t.id} onClick={() => api.setTool(t.id)} className="px-1">
@@ -149,6 +165,8 @@ export function PanelMurs({ api }: { api: WorkspaceApi }) {
               Tout désélectionner
             </Button>
           </div>
+          </div>
+          </details>
           {z.surface === "porte" && (
             <div className="grid gap-1 rounded-md bg-muted/50 p-2">
               <p className="flex items-center gap-1 text-xs font-medium">
@@ -243,6 +261,17 @@ export function PanelMurs({ api }: { api: WorkspaceApi }) {
             />
           </div>
         </div>
+        {murs.length > 0 && (
+          <div className="flex items-center gap-1 text-xs" role="radiogroup" aria-label="Appliquer sur">
+            <span className="text-muted-foreground">Appliquer sur :</span>
+            <Button size="sm" role="radio" aria-checked={cible === "murs"} variant={cible === "murs" ? "default" : "outline"} className="h-7 px-2 text-xs" onClick={() => setCible("murs")}>
+              Tous les murs ({murs.length})
+            </Button>
+            <Button size="sm" role="radio" aria-checked={cible === "active"} variant={cible === "active" ? "default" : "outline"} className="h-7 max-w-[130px] truncate px-2 text-xs" onClick={() => setCible("active")} disabled={!z}>
+              {z ? z.name : "Surface choisie"}
+            </Button>
+          </div>
+        )}
         <div className="flex rounded-md border p-0.5" role="tablist" aria-label="Type de finition">
           {KINDS.map((k) => (
             <button
@@ -284,8 +313,8 @@ export function PanelMurs({ api }: { api: WorkspaceApi }) {
                 <button
                   type="button"
                   className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                  title={z ? `Appliquer sur « ${z.name} »` : "Sélectionnez d'abord une surface"}
-                  onClick={() => api.applyFinish(f)}
+                  title={cible === "murs" && murs.length ? "Appliquer sur tous les murs" : z ? `Appliquer sur « ${z.name} »` : "Sélectionnez d'abord une surface"}
+                  onClick={() => appliquer(f)}
                 >
                   <Swatch color={f.color} texture={f.texture_path} className="h-7 w-7 shrink-0" />
                   <span className="min-w-0">
@@ -316,7 +345,7 @@ export function PanelMurs({ api }: { api: WorkspaceApi }) {
         </ul>
         {z && (
           <p className="flex items-center gap-1 text-xs text-muted-foreground">
-            <ScanLine className="h-3 w-3" /> Un clic sur une teinte l'applique à « {z.name} » ; les articles restent à leur place.
+            <ScanLine className="h-3 w-3" /> Un clic sur une teinte l'applique {cible === "murs" && murs.length ? "à tous les murs (les teintes de sol, plafond ou porte vont sur ces surfaces)" : `à « ${z.name} »`} ; les articles restent à leur place.
           </p>
         )}
       </section>

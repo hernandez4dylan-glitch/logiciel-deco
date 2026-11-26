@@ -64,7 +64,21 @@ export type Zone = {
   surface: Surface;
   /** Finition choisie pour cette surface ; null = celle de la teinte, sinon celle de la surface. */
   aspect: Aspect | null;
+  /** Surface trouvée par l'analyse automatique de la pièce (correction manuelle repliée). */
+  auto: boolean;
 };
+
+/** Résultat de la reconnaissance automatique de la pièce (lancée une seule fois). */
+export type AnalyseInfo = {
+  /** Durées en secondes : segmentation, profondeur, contours, pans, total. */
+  temps: Record<string, number>;
+  /** Secondes entre l'ouverture de la photo et le premier aperçu affiché. */
+  apercu: number | null;
+  date: string;
+};
+
+/** Rendu de l'« Optimisation finale » gardé : valable tant que la composition n'a pas changé. */
+export type Optimise = { image: string; cle: string; duree: number };
 
 /** Finition réellement rendue pour une zone. */
 export function zoneAspect(z: Pick<Zone, "aspect" | "finish" | "surface">): Aspect {
@@ -120,6 +134,8 @@ export type Scene = {
   baseOriginal: string | null;
   /** États précédents de la photo, le plus récent en dernier (« Annuler la dernière retouche »). */
   baseHistory: BaseStep[];
+  analyse: AnalyseInfo | null;
+  optimise: Optimise | null;
 };
 
 export type BaseStep = { base: string; visibles: string[]; foreground: string | null };
@@ -150,7 +166,36 @@ export function popHistory(scene: Scene): { scene: Scene; base: string } | null 
 
 export const DEFAULT_SHADOW: Shadow = { opacity: 0.45, blur: 0.5, size: 1 };
 
-export const newScene = (): Scene => ({ version: 1, zones: [], items: [], cast: { ...DEFAULT_CAST }, foreground: null, baseOriginal: null, baseHistory: [] });
+export const newScene = (): Scene => ({
+  version: 1,
+  zones: [],
+  items: [],
+  cast: { ...DEFAULT_CAST },
+  foreground: null,
+  baseOriginal: null,
+  baseHistory: [],
+  analyse: null,
+  optimise: null,
+});
+
+/** Empreinte de ce qui se voit sur le visuel (photo, finitions, articles, ombres) : un
+ *  rendu optimisé n'est réutilisé que si rien n'a changé depuis. */
+export function compositionKey(scene: Scene, basePath: string) {
+  const vu = JSON.stringify([
+    basePath,
+    scene.foreground,
+    scene.cast,
+    scene.items,
+    scene.zones.map((z) => [z.mask, z.finish, z.quad, z.repetitions, z.lumiere, z.visible, z.surface, z.aspect]),
+  ]);
+  let h1 = 0x811c9dc5, h2 = 0x01000193;
+  for (let i = 0; i < vu.length; i++) {
+    const c = vu.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ c, 0x5bd1e995) >>> 0;
+  }
+  return h1.toString(16).padStart(8, "0") + h2.toString(16).padStart(8, "0");
+}
 
 const num = (v: unknown, d: number, min = -Infinity, max = Infinity) =>
   typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : d;
@@ -178,6 +223,22 @@ export function parseScene(text: string | null | undefined): Scene {
       opacity: num(c["opacity"], DEFAULT_CAST.opacity, 0, 1),
     }))((raw["cast"] ?? {}) as Record<string, unknown>),
     baseOriginal: str(raw["baseOriginal"]),
+    analyse: ((a: unknown): AnalyseInfo | null => {
+      if (!a || typeof a !== "object") return null;
+      const o = a as Record<string, unknown>;
+      const t = (o["temps"] ?? {}) as Record<string, unknown>;
+      return {
+        temps: Object.fromEntries(Object.entries(t).filter(([, v]) => typeof v === "number" && Number.isFinite(v))) as Record<string, number>,
+        apercu: typeof o["apercu"] === "number" && Number.isFinite(o["apercu"]) ? (o["apercu"] as number) : null,
+        date: str(o["date"]) ?? "",
+      };
+    })(raw["analyse"]),
+    optimise: ((o: unknown): Optimise | null => {
+      if (!o || typeof o !== "object") return null;
+      const r = o as Record<string, unknown>;
+      const image = str(r["image"]), cle = str(r["cle"]);
+      return image && cle ? { image, cle, duree: num(r["duree"], 0, 0, 3600) } : null;
+    })(raw["optimise"]),
     baseHistory: (Array.isArray(raw["baseHistory"]) ? (raw["baseHistory"] as Record<string, unknown>[]) : [])
       .filter((h) => h && typeof h === "object" && typeof h["base"] === "string")
       .map((h) => ({
@@ -215,6 +276,7 @@ export function parseScene(text: string | null | undefined): Scene {
           visible: z["visible"] !== false,
           surface: isSurface(z["surface"]) ? z["surface"] : "mur",
           aspect: isAspect(z["aspect"]) ? z["aspect"] : null,
+          auto: z["auto"] === true,
         };
       }),
     items: items

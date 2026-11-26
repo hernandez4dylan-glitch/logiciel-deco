@@ -50,7 +50,18 @@
 <p class="note">Comment c’est fait : la baguette sélectionne chaque surface en quelques clics (l’intérieur des lettres collées est repris automatiquement), « Séparer le cadre » détache l’huisserie de la porte, et les reflets satiné / brillant sont tirés de la pièce (sol, meubles) symétriquement par rapport au pied de la surface. Limites : le reflet est une approximation (pas de calcul 3D de la pièce) ; il n’y a pas encore de reflet des fenêtres hors champ ; les teintes d’exemple sont fictives : les nuanciers fournisseurs se saisissent ou s’importent (CSV) dans la bibliothèque.</p>
 <p>Reproduire : <code>runtime\windows\python.exe local\tests\essais_finitions.py</code></p>
 
-<h2>5. Outils photo des versions précédentes</h2>
+<h2>5. IA locale : propositions dès l'import et optimisation finale</h2>
+<p>Aucun mur sélectionné à la main : l'analyse reconnaît les murs (pan par pan), le plafond, le sol et les portes, puis le studio propose 4 rendus avec les finitions de la bibliothèque. Mesuré sur un Intel Core i5-13400T sans carte graphique.</p>
+<h3>Hall (rendu de référence)</h3>
+<figure><img src="ia/hall-propositions.jpg" alt="Quatre propositions sur le hall"><figcaption>Peinture, enduit, papier peint, peinture + parquet — références sous chaque aperçu.</figcaption></figure>
+<figure><img src="ia/hall-vase-avant-apres.jpg" alt="Vase avant et après optimisation"><figcaption>Vase du catalogue posé sur le tabouret : montage, puis « Optimisation finale » (contour et ombre de contact harmonisés ; silhouette, couleur et émail conservés ; aucun pixel modifié hors de l'anneau retouché).</figcaption></figure>
+<h3>Salon en angle (deux murs qui se rejoignent, fauteuil au premier plan) — images produites par l'application</h3>
+<div class="pair"><figure><img src="piece-angle.jpg" alt="Salon d'origine"><figcaption>Image importée</figcaption></figure><figure><img src="ia/app-salon-angle-proposition-2.png" alt="Proposition 2"><figcaption>Béton ciré au fond, autre teinte sur le mur gauche : les deux pans sont traités séparément</figcaption></figure></div>
+<div class="pair"><figure><img src="ia/app-salon-angle-proposition-3.png" alt="Proposition 3"><figcaption>Papier peint au fond</figcaption></figure><figure><img src="ia/app-salon-angle-proposition-4.png" alt="Proposition 4"><figcaption>Sauge et parquet chêne</figcaption></figure></div>
+<div class="pair"><figure><img src="ia/app-salon-angle-montage.png" alt="Montage"><figcaption>Montage avec le vase</figcaption></figure><figure><img src="ia/app-salon-angle-optimise.png" alt="Optimisé"><figcaption>Après « Optimisation finale » (14 s)</figcaption></figure></div>
+<p class="note">Durées et détails : Essai_photo/ia/mesures-hall.json et SUIVI.md. La pièce en angle est une image de synthèse (aucune autre photo de pièce disponible) ; sur ce type d'image sans ombres, un coin de plafond uni peut rester compté comme mur.</p>
+
+<h2>6. Outils photo des versions précédentes</h2>
 <h3>Gomme : effacer un meuble</h3>
 <div class="trio">
 <figure><img src="gomme-fauteuil-masque.jpg" alt="Zone peinte sur le fauteuil"><figcaption>Zone peinte</figcaption></figure>

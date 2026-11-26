@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Brush, Image as ImageIcon, Loader2, Package, Paintbrush2, Redo2, Undo2 } from "lucide-react";
+import { Brush, Image as ImageIcon, Loader2, Package, Paintbrush2, Redo2, Sparkles, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Stage, BRUSH_TOOLS, type StageHandle, type StageTool } from "@/components/studio/stage";
@@ -13,12 +13,15 @@ import { localStore } from "@/lib/local-client";
 import type { ProductRow } from "@/lib/data";
 import type { StudioRows } from "@/lib/records";
 import { cutByMask, maskBounds, maskFromImage, newCanvas, strokeMask, tinted } from "@/lib/mask-canvas";
-import type { ItemAsset } from "@/lib/render-scene";
+import { drawComposition, type ItemAsset } from "@/lib/render-scene";
 import { finishPayload, itemImagePath, loadAsset, renderFinished } from "@/lib/compose";
-import { defaultQuad, floorQuad, itemBox, surfaceLabel, parseScene, popHistory, pushHistory, serializeScene, type CastShadow, type Item, type Point, type Quad, type Scene, type Surface, type Zone } from "@/lib/scene";
+import { defaultQuad, floorQuad, itemBox, surfaceLabel, parseScene, popHistory, pushHistory, serializeScene, type CastShadow, type Item, type Point, type Quad, type Scene, type Surface, type Zone, type AnalyseInfo, compositionKey } from "@/lib/scene";
+import { snapshotDe, type Proposition } from "@/lib/propositions";
+import { Propositions } from "@/components/studio/propositions";
+import { OptimisationDialog } from "@/components/studio/optimisation-dialog";
 import { accordLight, stats as lumStats, UndoStack } from "@/lib/lumiere";
 import { sampleColor } from "@/lib/couleur";
-import { canvasToBlob, canvasToDataUrl, loadImage, pathToDataUrl, photoEngine, photoUrl, uploadBlob } from "@/lib/studio-api";
+import { canvasToBlob, canvasToDataUrl, loadImage, pathToDataUrl, photoEngine, photoJson, photoUrl, uploadBlob } from "@/lib/studio-api";
 
 type Variant = StudioRows["variants"];
 type Finish = StudioRows["finishes"];
@@ -48,6 +51,12 @@ export type WorkspaceApi = {
   updateZone: (id: string, patch: Partial<Zone>) => void;
   removeZone: (id: string) => void;
   applyFinish: (f: Finish) => void;
+  /** Pose une finition sur plusieurs surfaces d'un coup (« Tous les murs »). */
+  applyFinishTo: (f: Finish, zoneIds: string[]) => void;
+  applyProposition: (p: Proposition) => void;
+  analyse: AnalyseInfo | null;
+  analysing: boolean;
+  reanalyse: () => void;
   refineZone: () => Promise<void>;
   clearMask: (key: string) => void;
   undoMask: () => void;
@@ -118,6 +127,10 @@ export function Workspace({
   const [tolerance, setTolerance] = useState(1);
   const [busy, setBusy] = useState<string | null>("Chargement de la photo…");
   const [panel, setPanel] = useState("murs");
+  const [analysing, setAnalysing] = useState(false);
+  /** Ouverture de la photo : point de départ de la mesure « premier aperçu ». */
+  const debut = useRef(performance.now());
+  const [optimOuvert, setOptimOuvert] = useState(false);
   const dirty = useRef(false);
   const saving = useRef(false);
   const again = useRef(false);
@@ -257,6 +270,8 @@ export function Workspace({
         if (!alive) return;
         setBaseImg(img);
         setCommitTick((t) => t + 1);
+        // Première ouverture d'une photo : reconnaissance automatique de la pièce (une seule fois).
+        if (!sceneRef.current.analyse && sceneRef.current.zones.length === 0) void runAnalyse(false, img);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Photo introuvable");
       } finally {
@@ -469,6 +484,69 @@ export function Workspace({
   const activeZone = scene.zones.find((z) => z.id === activeZoneId) ?? null;
   const selected = scene.items.find((i) => i.uid === selectedUid) ?? null;
 
+  /** Finition posée sur une surface : instantané de la fiche, perspective de départ
+   *  (rectangle du mur, trapèze pour un sol) et taille de motif adaptée à la surface. */
+  function patchFinition(z: Zone, f: Finish): Partial<Zone> {
+    const m = masks.current.get(z.id);
+    const b = m ? maskBounds(m) : null;
+    const boite = b ? { x0: b.x0 / W, y0: b.y0 / H, x1: b.x1 / W, y1: b.y1 / H } : null;
+    const quad = z.quad ?? (f.kind !== "peinture" && boite ? (z.surface === "sol" ? floorQuad(boite) : defaultQuad(boite)) : null);
+    const changeKind = z.finish?.kind !== f.kind;
+    // Papier peint : environ un lé de 53 cm pour 1/9 de la largeur de l'image, borné.
+    const largeur = boite ? boite.x1 - boite.x0 : 0.5;
+    const reps = f.kind === "enduit" ? 1.5 : z.surface === "sol" ? 7 : Math.min(12, Math.max(2, Math.round(largeur * 9 * 2) / 2));
+    return { finish: snapshotDe(f), aspect: null, quad, ...(changeKind ? { repetitions: reps } : {}) };
+  }
+
+  /** Reconnaissance de la pièce par l'IA locale : crée une surface par pan de mur, le
+   *  plafond, le sol et les portes. Les masques deviennent des surfaces ordinaires :
+   *  changer de finition ensuite ne relance jamais l'analyse. */
+  async function runAnalyse(force: boolean, img?: HTMLImageElement) {
+    if (analysing) return;
+    if (force && sceneRef.current.zones.some((z) => z.finish) && !window.confirm("Relancer l'analyse remplace les surfaces actuelles et leurs finitions. Continuer ?")) return;
+    const w = img?.naturalWidth ?? W, h = img?.naturalHeight ?? H;
+    setAnalysing(true);
+    if (force) debut.current = performance.now();
+    try {
+      const r = await photoJson<{ zones: { nom: string; surface: Surface; masque: string }[]; temps: Record<string, number> }>({
+        image: await pathToDataUrl(basePathRef.current),
+        mode: "analyse",
+      });
+      const nouvelles: Zone[] = [];
+      for (const z of r.zones) {
+        const id = crypto.randomUUID();
+        masks.current.set(id, maskFromImage(await loadImage(z.masque), w, h, true));
+        commits.current.set(id, 1);
+        dirtyMasks.current.add(id);
+        nouvelles.push({ id, name: z.nom, mask: null, finish: null, quad: null, repetitions: 4, lumiere: 1, visible: true, surface: z.surface, aspect: null, auto: true });
+      }
+      setScene((s) => ({
+        ...s,
+        zones: force ? nouvelles : [...s.zones, ...nouvelles],
+        analyse: { temps: r.temps, apercu: null, date: new Date().toISOString() },
+      }));
+      setActiveZoneId(nouvelles[0]?.id ?? null);
+      setCommitTick((t) => t + 1);
+      if (!nouvelles.length) toast.info("Aucun mur reconnu sur cette image : sélectionnez les surfaces à la baguette");
+      await flush();
+    } catch (e) {
+      toast.error("Analyse de la pièce impossible : " + (e instanceof Error ? e.message : ""));
+      setScene((s) => ({ ...s, analyse: { temps: {}, apercu: null, date: new Date().toISOString() } }));
+    } finally {
+      setAnalysing(false);
+    }
+  }
+
+  const premierApercu = useCallback(() => {
+    if (sceneRef.current.analyse && sceneRef.current.analyse.apercu === null) {
+      const sec = Math.round((performance.now() - debut.current) / 100) / 10;
+      sceneRef.current = { ...sceneRef.current, analyse: { ...sceneRef.current.analyse, apercu: sec } };
+      setSceneState(sceneRef.current);
+      dirty.current = true;
+      schedule();
+    }
+  }, [schedule]);
+
   // ------------------------------------------------------------ API des panneaux
   const api: WorkspaceApi = {
     scene,
@@ -489,7 +567,7 @@ export function Workspace({
       masks.current.set(id, newCanvas(W, H));
       setScene((s) => {
         const n = s.zones.filter((z) => z.surface === surface).length + 1;
-        const zone: Zone = { id, name: `${surfaceLabel(surface).split(" ")[0]} ${n}`, mask: null, finish: null, quad: null, repetitions: 4, lumiere: 1, visible: true, surface, aspect: null };
+        const zone: Zone = { id, name: `${surfaceLabel(surface).split(" ")[0]} ${n}`, mask: null, finish: null, quad: null, repetitions: 4, lumiere: 1, visible: true, surface, aspect: null, auto: false };
         return { ...s, zones: [...s.zones, zone] };
       });
       setActiveZoneId(id);
@@ -506,36 +584,28 @@ export function Workspace({
         toast.info("Sélectionnez d'abord un mur");
         return;
       }
-      const m = masks.current.get(activeZone.id);
-      const b = m ? maskBounds(m) : null;
-      if (!b) toast.info("Le mur n'est pas encore sélectionné : cliquez dessus avec la baguette");
-      const boite = b ? { x0: b.x0 / W, y0: b.y0 / H, x1: b.x1 / W, y1: b.y1 / H } : null;
-      // Un sol fuit vers le fond : trapèze de départ (bord du fond plus étroit), à ajuster par les 4 coins.
-      const quad =
-        activeZone.quad ??
-        (f.kind !== "peinture" && boite ? (activeZone.surface === "sol" ? floorQuad(boite) : defaultQuad(boite)) : null);
-      const changeKind = activeZone.finish?.kind !== f.kind;
-      api.updateZone(activeZone.id, {
-        finish: {
-          id: f.id,
-          kind: f.kind,
-          name: f.name,
-          reference: f.reference,
-          color: f.color,
-          texture: f.texture_path,
-          marque: f.marque ?? null,
-          gamme: f.gamme ?? null,
-          finition: f.finition,
-        },
-        // La finition de la fiche s'applique (une porte « satiné » du nuancier) ; on peut ensuite la changer.
-        aspect: null,
-        quad,
-        // Échelle de départ adaptée : un enduit se lit en grandes plages, un papier en motifs.
-        ...(changeKind ? { repetitions: f.kind === "enduit" ? 1.5 : 4 } : {}),
-      });
+      if (!masks.current.get(activeZone.id) || !maskBounds(masks.current.get(activeZone.id)!))
+        toast.info("Le mur n'est pas encore sélectionné : cliquez dessus avec la baguette");
+      api.applyFinishTo(f, [activeZone.id]);
+    },
+    applyFinishTo: (f, ids) => {
+      setScene((s) => ({ ...s, zones: s.zones.map((z) => (ids.includes(z.id) ? { ...z, ...patchFinition(z, f) } : z)) }));
       // On quitte la sélection pour voir le rendu sans la surbrillance verte.
       if (tool === "mur-clic" || tool === "mur-plus" || tool === "mur-moins") setTool("deplacer");
     },
+    applyProposition: (p) => {
+      setScene((s) => ({
+        ...s,
+        zones: s.zones.map((z) => {
+          const a = p.affectations.find((x) => x.zoneId === z.id);
+          return a ? { ...z, ...patchFinition(z, a.finish), visible: true } : z;
+        }),
+      }));
+      toast.success(`Proposition « ${p.titre} » appliquée — changez une teinte en un clic dans la bibliothèque`);
+    },
+    analyse: scene.analyse,
+    analysing,
+    reanalyse: () => void runAnalyse(true),
     splitFrame: async (epaisseur) => {
       const zone = activeZone;
       if (!zone) return;
@@ -567,7 +637,7 @@ export function Workspace({
           ...s,
           zones: [
             ...s.zones.map((z) => (z.id === zone.id ? { ...z, surface: "porte" as const } : z)),
-            { id, name: `Cadre de ${zone.name}`, mask: null, finish: null, quad: null, repetitions: 4, lumiere: zone.lumiere, visible: true, surface: "cadre", aspect: null },
+            { id, name: `Cadre de ${zone.name}`, mask: null, finish: null, quad: null, repetitions: 4, lumiere: zone.lumiere, visible: true, surface: "cadre", aspect: null, auto: false },
           ],
         }));
         setActiveZoneId(id);
@@ -820,6 +890,28 @@ export function Workspace({
                       ? "Cliquez où poser la base de l'article (sol, plateau de la console…)"
                       : undefined);
 
+  /** Calques envoyés à l'optimisation : le montage tel qu'affiché, la silhouette des
+   *  articles ajoutés et leurs ombres (le premier plan existant les masque). */
+  async function calquesOptimisation() {
+    if (finishing) throw new Error("Attendez la fin de l'application des finitions");
+    const bg = background;
+    if (!bg) throw new Error("Photo non chargée");
+    const dessin = (fond: CanvasImageSource | null, opts: { noShadows?: boolean; foregroundErase?: boolean }) => {
+      const c = newCanvas(W, H);
+      drawComposition(c.getContext("2d")!, {
+        W, H, background: fond ?? newCanvas(W, H), items: scene.items, asset: assetFor, foreground, cast: scene.cast, ...opts,
+      });
+      return c;
+    };
+    return {
+      montage: dessin(bg, {}),
+      articles: dessin(null, { noShadows: true, foregroundErase: true }),
+      ombres: dessin(null, { foregroundErase: true }),
+    };
+  }
+  const cleComposition = compositionKey(scene, basePath);
+  const optimiseValide = scene.optimise && scene.optimise.cle === cleComposition ? scene.optimise : null;
+
   return (
     <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)_280px]">
       <aside className="surface order-2 p-3 xl:order-1 print:hidden">
@@ -843,7 +935,45 @@ export function Workspace({
             <Redo2 className="h-4 w-4" /> Rétablir
           </Button>
           <span className="text-xs text-muted-foreground">articles, réglages et finitions</span>
+          <div className="ml-auto flex items-center gap-2">
+            {optimiseValide && (
+              <a href={photoUrl(optimiseValide.image)} target="_blank" rel="noreferrer" className="text-xs text-primary underline">
+                Rendu optimisé gardé ({optimiseValide.duree.toLocaleString("fr-FR")} s)
+              </a>
+            )}
+            <Button
+              size="sm"
+              variant="hero"
+              disabled={!scene.items.length || !!busy || finishing}
+              title={scene.items.length ? "Retouche locale du montage validé (contours, grain, ombres des articles)" : "Placez d'abord un article"}
+              onClick={() => setOptimOuvert(true)}
+            >
+              <Sparkles className="h-4 w-4" /> Optimisation finale
+            </Button>
+          </div>
         </div>
+        <Propositions
+          zones={scene.zones}
+          finishes={finishes}
+          basePath={basePath}
+          W={W}
+          H={H}
+          mask={(id) => masks.current.get(id)}
+          zonesPour={(p) =>
+            scene.zones
+              .map((z) => {
+                const a = p.affectations.find((x) => x.zoneId === z.id);
+                return a ? { ...z, ...patchFinition(z, a.finish), visible: true } : z;
+              })
+              .filter((z) => z.finish && z.visible)
+          }
+          analyse={scene.analyse}
+          analysing={analysing}
+          onChoose={api.applyProposition}
+          onFirstPreview={premierApercu}
+          onReanalyse={api.reanalyse}
+          version={commitTick}
+        />
         <Stage
           ref={stage}
           W={W}
@@ -884,6 +1014,17 @@ export function Workspace({
       <aside className="order-3 print:hidden">
         <PanelReferences api={api} discount={discount} />
       </aside>
+      <OptimisationDialog
+        open={optimOuvert}
+        onOpenChange={setOptimOuvert}
+        calques={calquesOptimisation}
+        onKeep={async (dataUrl, duree) => {
+          const blob = await (await fetch(dataUrl)).blob();
+          const image = await uploadBlob("optimise", blob, "png");
+          setScene((s) => ({ ...s, optimise: { image, cle: compositionKey(s, basePathRef.current), duree } }));
+          toast.success("Rendu optimisé gardé : il sert au visuel PNG et à la fiche client tant que la composition ne change pas");
+        }}
+      />
     </div>
   );
 }

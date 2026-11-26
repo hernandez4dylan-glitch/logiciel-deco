@@ -59,7 +59,14 @@ class Handler(BaseHTTPRequestHandler):
         mime={'.js':'text/javascript','.css':'text/css','.woff2':'font/woff2'}.get(f.suffix) or mimetypes.guess_type(f.name)[0] or 'application/octet-stream'
         self.reply(200,f.read_bytes(),mime)
     def do_POST(self):
-        if not self.allowed(True): return self.reply(403,b'Forbidden','text/plain')
+        if not self.allowed(True):
+            # Corps lu (et jeté) avant le refus : sinon Windows coupe la connexion et le
+            # client ne reçoit pas la réponse 403.
+            try:
+                n=int(self.headers.get('Content-Length',0))
+                if 0<n<=1024*1024: self.rfile.read(n)
+            except (TypeError,ValueError,OSError): pass
+            return self.reply(403,b'Forbidden','text/plain')
         try:
             n=int(self.headers.get('Content-Length',0))
             if n<=0 or n>64*1024*1024: raise ValueError('Fichier trop grand ou vide')
@@ -71,7 +78,10 @@ class Handler(BaseHTTPRequestHandler):
                 result=None
             elif self.path=='/api/photo':
                 from photo import render
-                return self.reply(200,render(json.loads(raw)),'image/png')
+                out=render(json.loads(raw))
+                # Analyse de pièce et optimisation : réponse JSON (zones, durées) ; sinon une image PNG.
+                if isinstance(out,dict): return self.reply(200,json.dumps({'data':out,'error':None}).encode(),'application/json')
+                return self.reply(200,out,'image/png')
             elif self.path=='/api/data':
                 with GATE, closing(dbopen()) as db, db:
                     result=dispatch(db,json.loads(raw))

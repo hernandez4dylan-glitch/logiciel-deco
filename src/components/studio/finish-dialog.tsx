@@ -13,7 +13,7 @@ import { ASPECTS, SURFACES, isAspect } from "@/lib/scene";
 import { photoUrl, uploadBlob } from "@/lib/studio-api";
 
 type Finish = StudioRows["finishes"];
-export const KIND_LABEL: Record<Finish["kind"], string> = { peinture: "Peinture", papier: "Papier peint / revêtement", enduit: "Enduit / béton ciré" };
+export const KIND_LABEL: Record<Finish["kind"], string> = { peinture: "Peinture", papier: "Papier peint / revêtement", enduit: "Enduit / chaux / béton ciré" };
 const TOUS = "tous";
 
 /** Création ou modification d'une teinte / matière du magasin, comme un produit :

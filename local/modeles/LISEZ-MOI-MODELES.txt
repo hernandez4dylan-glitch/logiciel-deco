@@ -1,0 +1,39 @@
+MODÈLES D'IA INCLUS — exécutés sur le PC, hors ligne, sans clé ni coût par image
+
+1. Analyse de la pièce (lancée une fois à l'import d'une photo)
+   piece_segmentation.onnx — UperNet + ConvNeXt-Small, entraîné sur ADE20K (150 catégories :
+     mur, plafond, sol, porte, fenêtre, tableau, meubles…). Source : openmmlab/upernet-convnext-small
+     (Hugging Face). Licence MIT. Converti en ONNX (entrée fixe 576 × 576) pour ce logiciel.
+   piece_profondeur.onnx — Depth Anything V2 Small. Source : depth-anything/Depth-Anything-V2-Small-hf.
+     Licence Apache 2.0 (texte : licences/Apache-2.0.txt). Converti en ONNX pour ce logiciel.
+     (Seule la version Small est sous Apache 2.0 ; les versions Base/Large ne le sont pas.)
+   ade20k_labels.json — noms des 150 catégories (configuration du modèle ci-dessus).
+
+2. « Optimisation finale » (lancée uniquement par le bouton)
+   sd_unet.onnx + sd_unet.onnx.data — Stable Diffusion 1.5 Inpainting
+     (source : stable-diffusion-v1-5/stable-diffusion-inpainting, licence CreativeML OpenRAIL-M,
+     texte complet : licences/CreativeML-OpenRAIL-M.txt), dans lequel a été fusionné
+     LCM-LoRA SD 1.5 (source : latent-consistency/lcm-lora-sdv1-5, licence CreativeML
+     OpenRAIL++-M, texte complet : licences/CreativeML-OpenRAIL-plusplus.md).
+     FICHIER MODIFIÉ : poids LCM-LoRA fusionnés dans l'UNet, puis conversion au format ONNX
+     (fp32) pour onnxruntime, par l'éditeur de ce logiciel, le 25/11/2026.
+   taesd_encodeur.onnx, taesd_decodeur.onnx — TAESD (madebyollin/taesd), licence MIT, convertis
+     en ONNX. Remplacent l'auto-encodeur d'origine (bien plus rapide sur processeur).
+   consigne.npz — la consigne d'optimisation enregistrée, pré-encodée par l'encodeur de texte
+     CLIP de Stable Diffusion 1.5 (consigne.json : texte utilisé).
+
+RESTRICTIONS D'USAGE (CreativeML OpenRAIL-M et OpenRAIL++-M, paragraphe 5 et annexe A)
+En utilisant l'« Optimisation finale », vous vous engagez à ne pas utiliser le modèle ni ses
+dérivés : en violation de la loi ; pour exploiter ou nuire à des mineurs ; pour créer ou diffuser
+de fausses informations dans le but de nuire ; pour diffuser des données personnelles permettant
+de nuire à une personne ; pour diffamer ou harceler ; pour des décisions entièrement automatisées
+portant atteinte aux droits d'une personne ; pour discriminer ou nuire à des personnes ou groupes
+(comportement social, caractéristiques personnelles ou catégories protégées par la loi) ; pour
+exploiter les vulnérabilités d'un groupe de personnes ; pour donner des avis médicaux ; pour
+l'administration de la justice, le maintien de l'ordre, l'immigration ou l'asile.
+Ces restrictions s'appliquent aussi à toute personne à qui vous transmettez le logiciel.
+Les images produites vous appartiennent ; vous êtes responsable de leur usage (paragraphe 6).
+Usage commercial (rendez-vous clients en magasin, visuels de proposition) : autorisé.
+
+Recréer ces fichiers : voir local\outils\ia\LIRE_MOI.txt (téléchargement et conversion, outils
+de développement nécessaires, non inclus dans le logiciel).

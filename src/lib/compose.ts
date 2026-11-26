@@ -1,7 +1,7 @@
 import { drawComposition, prepareAsset, type ItemAsset } from "@/lib/render-scene";
 import { maskFromImage, newCanvas, cutByMask } from "@/lib/mask-canvas";
 import { canvasToDataUrl, loadImage, pathToDataUrl, photoEngine, photoUrl } from "@/lib/studio-api";
-import { zoneAspect, type Item, type Scene, type Zone } from "@/lib/scene";
+import { compositionKey, zoneAspect, type Item, type Scene, type Zone } from "@/lib/scene";
 
 export type PhotoRow = { id: string; product_id: string; image_path: string; cutout_path: string | null };
 export type ProductImages = { id: string; image_url: string | null; cutout_url: string | null };
@@ -65,6 +65,18 @@ export async function composeVariant(
 ) {
   const base = await loadImage(photoUrl(row.base_path));
   const W = base.naturalWidth, H = base.naturalHeight;
+  // Rendu de l'« Optimisation finale » gardé et toujours à jour : c'est lui qui est remis.
+  if (scene.optimise && scene.optimise.cle === compositionKey(scene, row.base_path)) {
+    try {
+      const opt = await loadImage(photoUrl(scene.optimise.image));
+      const s = maxSide ? Math.min(1, maxSide / Math.max(W, H)) : 1;
+      const c = newCanvas(Math.round(W * s), Math.round(H * s));
+      c.getContext("2d")!.drawImage(opt, 0, 0, c.width, c.height);
+      return c;
+    } catch {
+      /* fichier absent : on recompose le montage */
+    }
+  }
   const masks = new Map<string, HTMLCanvasElement>();
   for (const z of scene.zones) if (z.mask) masks.set(z.id, maskFromImage(await loadImage(photoUrl(z.mask)), W, H));
   const payload = await finishPayload(scene.zones, (z) => masks.get(z.id) ?? null, W, H);

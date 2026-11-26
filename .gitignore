@@ -16,3 +16,9 @@ __pycache__/
 *.sqlite3-journal
 .env
 .env.*
+ia-conv/
+
+# Modèles d'IA (≈ 4 Go) : livrés dans le ZIP Windows, régénérables (local/outils/ia)
+local/modeles/*.onnx
+local/modeles/*.onnx.data
+local/modeles/*.npz

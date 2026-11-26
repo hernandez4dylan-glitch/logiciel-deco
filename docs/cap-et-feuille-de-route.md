@@ -30,6 +30,8 @@ Les clients de la boutique et ceux des décorateurs meublent leur intérieur ave
   porte / cadre / sol ; « Séparer le cadre » ; finitions mat, velours, satiné, brillant avec reflets du sol
 - [x] Bibliothèque : teintes et matières comme des produits (marque, gamme, référence, finition, usage), recherche,
   filtre par marque, import de nuancier fournisseur (CSV Excel) sans doublon
+- [x] Studio : reconnaissance automatique de la pièce à l'import (IA locale), 4 propositions avec nos finitions,
+  « Tous les murs » présélectionné comme dans la V1, « Optimisation finale » générative locale avec avant/après
 - [ ] Nuanciers fournisseurs à saisir ou importer (références réelles, couleurs officielles, motifs des papiers)
 - [x] Outils sans crédits : tout fonctionne sur le PC, sans clé API ni coût par rendu
 - [ ] Rendu photoréaliste complet (rééclairage de toute la scène) : non réalisable en local à ce jour

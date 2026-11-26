@@ -123,6 +123,35 @@ def render(p):
         result=np.round(selectionner(rgb,plus,moins,float(np.clip(tol,.3,3)))*255).astype(np.uint8)
     elif mode=='affiner':
         result=np.round(affiner(rgb,masque(p,'mask',img))*255).astype(np.uint8)
+    elif mode=='analyse':
+        # Reconnaissance de la pièce : zones (murs par pan, plafond, sol, portes) en PNG.
+        import analyse
+        r=analyse.analyser(rgb)
+        zones=[]
+        for z in r['zones']:
+            ok,buf=cv2.imencode('.png',np.round(np.clip(z['masque'],0,1)*255).astype(np.uint8))
+            if not ok: raise ValueError('Export du masque impossible')
+            zones.append({'nom':z['nom'],'surface':z['surface'],'profondeur':round(float(z['profondeur']),3),
+                          'part':round(float((z['masque']>0.5).mean()),4),
+                          'masque':'data:image/png;base64,'+base64.b64encode(buf.tobytes()).decode()})
+        return {'zones':zones,'temps':r['temps'],'elements':r['elements']}
+    elif mode=='optimiser':
+        # Optimisation finale : retouche générative limitée aux contours et ombres des articles.
+        import optimisation
+        def calque(cle):
+            m=decode(p[cle]) if p.get(cle) else None
+            if m is None: return np.zeros(rgb.shape[:2],np.float32)
+            if m.shape[:2]!=rgb.shape[:2]: raise ValueError('Taille du calque incompatible')
+            return (m[:,:,3] if m.shape[2]==4 else cv2.cvtColor(m,cv2.COLOR_BGR2GRAY)).astype(np.float32)/255.0
+        articles=calque('articles')
+        ombres=np.clip(calque('ombres')-articles,0,1)
+        out,zones,temps=optimisation.optimiser(rgb,articles,ombres)
+        ok1,b1=cv2.imencode('.png',out)
+        ok2,b2=cv2.imencode('.png',np.round(zones*255).astype(np.uint8))
+        if not (ok1 and ok2): raise ValueError('Export PNG impossible')
+        return {'image':'data:image/png;base64,'+base64.b64encode(b1.tobytes()).decode(),
+                'zones':'data:image/png;base64,'+base64.b64encode(b2.tobytes()).decode(),
+                'temps':temps,'consigne':optimisation.CONSIGNE}
     elif mode=='cadre':
         # Sépare une porte sélectionnée avec son huisserie : 'partie' = 'cadre' ou 'porte'.
         try: ep=float(p.get('epaisseur') or 12)

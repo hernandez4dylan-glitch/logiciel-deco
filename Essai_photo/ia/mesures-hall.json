@@ -1,0 +1,20 @@
+{
+ "analyse_s": 14.6,
+ "detail_analyse": {
+  "segmentation": 2.41,
+  "profondeur": 3.25,
+  "contours": 8.34,
+  "pans": 0.54,
+  "total": 14.55
+ },
+ "apercus_s": [
+  1.3,
+  0.43,
+  0.38,
+  1.49
+ ],
+ "premier_apercu_moteur_s": 15.9,
+ "optimisation_s": 36.9,
+ "ecart_max_hors_zones": 1.0,
+ "materiel": "Intel Core i5-13400T, 16 Go, sans carte graphique dédiée"
+}

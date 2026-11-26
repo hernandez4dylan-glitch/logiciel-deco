@@ -128,6 +128,14 @@ export function drawItem(ctx: CanvasRenderingContext2D, item: Item, box: Box, as
  * fond fini → articles « derrière » → premier plan existant → autres articles.
  * La même fonction sert à l'écran et à l'export : ce que l'on voit est ce que l'on remet.
  */
+function drawForeground(ctx: CanvasRenderingContext2D, o: { W: number; H: number; foreground: CanvasImageSource | null; foregroundErase?: boolean }) {
+  if (!o.foreground) return;
+  ctx.save();
+  if (o.foregroundErase) ctx.globalCompositeOperation = "destination-out";
+  ctx.drawImage(o.foreground, 0, 0, o.W, o.H);
+  ctx.restore();
+}
+
 export function drawComposition(
   ctx: CanvasRenderingContext2D,
   o: {
@@ -139,6 +147,10 @@ export function drawComposition(
     foreground: CanvasImageSource | null;
     boxes?: Map<string, Box>;
     cast?: CastShadow;
+    /** Sans ombres : silhouette exacte des articles (optimisation finale). */
+    noShadows?: boolean;
+    /** Le premier plan efface au lieu de recouvrir (calque transparent des articles). */
+    foregroundErase?: boolean;
   },
 ) {
   ctx.drawImage(o.background, 0, 0, o.W, o.H);
@@ -146,18 +158,18 @@ export function drawComposition(
   let fgDone = !o.foreground;
   for (const it of order) {
     if (!fgDone && !it.behind) {
-      ctx.drawImage(o.foreground!, 0, 0, o.W, o.H);
+      drawForeground(ctx, o);
       fgDone = true;
     }
     const a = o.asset(it);
     if (!a) continue;
     const box = itemBox(it, a.aspect, o.W, o.H);
     o.boxes?.set(it.uid, box);
-    if (a.cut) {
+    if (a.cut && !o.noShadows) {
       if (o.cast) drawCast(ctx, it, box, a, o.cast);
       drawShadow(ctx, it, box, a);
     }
     drawItem(ctx, it, box, a);
   }
-  if (!fgDone) ctx.drawImage(o.foreground!, 0, 0, o.W, o.H);
+  if (!fgDone) drawForeground(ctx, o);
 }
