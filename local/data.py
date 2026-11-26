@@ -33,7 +33,7 @@ NUMBERS = ('purchase_price_ht','sale_price_ttc','pro_price_ttc','amount','stock'
 FACULTATIFS = {'motif_cm'}  # nombres qui peuvent rester vides
 FINITIONS = {'peinture','papier','enduit'}
 ASPECTS = {'mat','velours','satin','brillant'}  # finition d'une peinture
-USAGES = {'mur','plafond','porte','cadre','sol','autre'}
+USAGES = {'mur','plafond','porte','cadre','plinthe','sol','autre'}
 TOUCH = {'projects','variants','finishes'}  # tables avec updated_at
 
 # Migrations additives : jamais de suppression ni de réécriture des données existantes.

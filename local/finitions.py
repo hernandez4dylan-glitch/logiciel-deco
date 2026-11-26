@@ -265,10 +265,10 @@ BRILLANCE = {
 }
 
 # Finition par défaut selon la surface (usage courant des peintres).
-FINITION_SURFACE = {'mur': 'mat', 'plafond': 'mat', 'porte': 'satin', 'cadre': 'satin', 'sol': 'satin', 'autre': 'mat'}
+FINITION_SURFACE = {'mur': 'mat', 'plafond': 'mat', 'porte': 'satin', 'cadre': 'satin', 'plinthe': 'satin', 'sol': 'satin', 'autre': 'mat'}
 # Lissé du support : une porte ou une boiserie laquée est lisse et reflète nettement ;
 # un grand mur ou un plafond enduit, même en satiné, renvoie un reflet bien plus diffus.
-LISSE_SURFACE = {'mur': 0.45, 'plafond': 0.35, 'porte': 1.0, 'cadre': 1.0, 'sol': 0.8, 'autre': 1.0}
+LISSE_SURFACE = {'mur': 0.45, 'plafond': 0.35, 'porte': 1.0, 'cadre': 1.0, 'plinthe': 1.0, 'sol': 0.8, 'autre': 1.0}
 
 
 def _flou(x, sigma):

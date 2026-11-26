@@ -8,7 +8,7 @@ export type Point = [number, number];
 export type Quad = [Point, Point, Point, Point];
 export type FinishKind = "peinture" | "papier" | "enduit";
 /** Nature de la surface sélectionnée : change la finition par défaut et le rendu (reflets). */
-export type Surface = "mur" | "plafond" | "porte" | "cadre" | "sol" | "autre";
+export type Surface = "mur" | "plafond" | "porte" | "cadre" | "plinthe" | "sol" | "autre";
 /** Aspect de la peinture : du plus mat au plus brillant. */
 export type Aspect = "mat" | "velours" | "satin" | "brillant";
 
@@ -17,6 +17,7 @@ export const SURFACES: { id: Surface; label: string }[] = [
   { id: "plafond", label: "Plafond" },
   { id: "porte", label: "Porte" },
   { id: "cadre", label: "Cadre / huisserie" },
+  { id: "plinthe", label: "Plinthe" },
   { id: "sol", label: "Sol" },
   { id: "autre", label: "Autre (boiserie, meuble)" },
 ];
@@ -27,7 +28,7 @@ export const ASPECTS: { id: Aspect; label: string }[] = [
   { id: "brillant", label: "Brillant" },
 ];
 /** Finition habituelle d'une surface quand la teinte n'en précise pas. */
-export const SURFACE_ASPECT: Record<Surface, Aspect> = { mur: "mat", plafond: "mat", porte: "satin", cadre: "satin", sol: "satin", autre: "mat" };
+export const SURFACE_ASPECT: Record<Surface, Aspect> = { mur: "mat", plafond: "mat", porte: "satin", cadre: "satin", plinthe: "satin", sol: "satin", autre: "mat" };
 export const isAspect = (v: unknown): v is Aspect => typeof v === "string" && ASPECTS.some((a) => a.id === v);
 export const isSurface = (v: unknown): v is Surface => typeof v === "string" && SURFACES.some((a) => a.id === v);
 export const aspectLabel = (a: Aspect) => ASPECTS.find((x) => x.id === a)?.label ?? a;

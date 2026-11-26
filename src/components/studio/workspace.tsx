@@ -14,7 +14,7 @@ import type { ProductRow } from "@/lib/data";
 import type { StudioRows } from "@/lib/records";
 import { cutByMask, maskBounds, maskFromImage, newCanvas, strokeMask, tinted } from "@/lib/mask-canvas";
 import { drawComposition, type ItemAsset } from "@/lib/render-scene";
-import { finishPayload, itemImagePath, loadAsset, renderFinished } from "@/lib/compose";
+import { finishPayload, itemImagePath, loadAsset, renderFinished, renderFinishedApercu } from "@/lib/compose";
 import { defaultQuad, floorQuad, itemBox, surfaceLabel, parseScene, popHistory, pushHistory, serializeScene, type CastShadow, type Item, type Point, type Quad, type Scene, type Surface, type Zone, type AnalyseInfo, compositionKey, aspectLabel, zoneAspect } from "@/lib/scene";
 import { OptimisationDialog } from "@/components/studio/optimisation-dialog";
 import { ExportIaDialog } from "@/components/studio/export-ia-dialog";
@@ -84,6 +84,7 @@ export type WorkspaceApi = {
   replaceBase: (file: File) => Promise<void>;
 };
 
+const APERCU_MAX = 1400;
 const kindHeight: Record<string, number> = { Mobilier: 0.34, Luminaire: 0.22, Textile: 0.14, "Objet déco": 0.1 };
 
 export function Workspace({
@@ -135,6 +136,8 @@ export function Workspace({
   const [optimOuvert, setOptimOuvert] = useState(false);
   const [exportOuvert, setExportOuvert] = useState(false);
   const [pinceau, setPinceau] = useState<Finish | null>(null);
+  /** Surface sous la souris quand une teinte est choisie (aperçu avant le clic). */
+  const [survol, setSurvol] = useState<string | null>(null);
   const dirty = useRef(false);
   const saving = useRef(false);
   const again = useRef(false);
@@ -320,8 +323,9 @@ export function Workspace({
       }
       setFinishing(true);
       try {
-        const payload = await finishPayload(zones, (z) => masks.current.get(z.id) ?? null, W, H);
-        const img = await renderFinished(basePath, payload, ctrl.signal);
+        // Aperçu réduit (1400 px au plus) : un clic de peinture s'affiche en quelques secondes
+        // même sur une photo de 12 Mpx ; la pleine résolution est calculée pour l'export.
+        const img = await renderFinishedApercu(baseImg, zones, (z) => masks.current.get(z.id) ?? null, W, H, APERCU_MAX, ctrl.signal);
         if (!ctrl.signal.aborted) setFinished(img);
       } catch (e) {
         if (!ctrl.signal.aborted) toast.error(e instanceof Error ? e.message : "Finition impossible");
@@ -400,7 +404,7 @@ export function Workspace({
   /** Surface de la photo sous le point cliqué : la plus « petite » d'abord (une porte
    *  avant le mur qui l'entoure). */
   function surfaceSous(p: Point): Zone | null {
-    const ordre: Surface[] = ["porte", "cadre", "autre", "mur", "plafond", "sol"];
+    const ordre: Surface[] = ["plinthe", "cadre", "porte", "autre", "mur", "plafond", "sol"];
     let meilleure: Zone | null = null;
     for (const z of sceneRef.current.zones) {
       const m = masks.current.get(z.id);
@@ -542,6 +546,18 @@ export function Workspace({
     return overlayCanvas.current;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [overlayKey, tick, commitTick]);
+
+  const survolCanvas = useRef<HTMLCanvasElement | null>(null);
+  const apercuSurvol = useMemo(() => {
+    if (tool !== "peindre" || !pinceau || !survol || overlayKey) return null;
+    const m = masks.current.get(survol);
+    if (!m) return null;
+    // Couleur choisie posée en transparence : on voit ce qui va être peint avant de cliquer.
+    survolCanvas.current = tinted(m, pinceau.color ?? "#ffffff", survolCanvas.current?.width === m.width ? survolCanvas.current : undefined);
+    return survolCanvas.current;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tool, pinceau, survol, overlayKey, commitTick]);
+  const zoneSurvolee = survol ? scene.zones.find((z) => z.id === survol) ?? null : null;
 
   const activeZone = scene.zones.find((z) => z.id === activeZoneId) ?? null;
   const selected = scene.items.find((i) => i.uid === selectedUid) ?? null;
@@ -920,7 +936,9 @@ export function Workspace({
     (finishing
       ? "Application des finitions…"
       : tool === "peindre" && pinceau
-        ? `Cliquez sur un mur, le plafond, le sol ou une porte : « ${pinceau.name} »`
+        ? zoneSurvolee
+          ? `Cliquez pour peindre « ${zoneSurvolee.name} » en ${pinceau.name}`
+          : `Cliquez sur un mur, le plafond, le sol ou une porte : « ${pinceau.name} »`
         : tool === "mur-clic"
         ? "Cliquez sur le mur à sélectionner"
         : tool === "mur-plus"
@@ -944,9 +962,12 @@ export function Workspace({
   /** Calques envoyés à l'optimisation : le montage tel qu'affiché, la silhouette des
    *  articles ajoutés et leurs ombres (le premier plan existant les masque). */
   async function calquesOptimisation() {
-    if (finishing) throw new Error("Attendez la fin de l'application des finitions");
-    const bg = background;
-    if (!bg) throw new Error("Photo non chargée");
+    if (!baseImg) throw new Error("Photo non chargée");
+    // Fond en pleine résolution pour l'export (l'écran montre un aperçu réduit).
+    const zonesFinies = sceneRef.current.zones.filter((z) => z.finish && z.visible && masks.current.get(z.id) && maskBounds(masks.current.get(z.id)!, 16));
+    const bg: CanvasImageSource = zonesFinies.length
+      ? await renderFinished(basePathRef.current, await finishPayload(zonesFinies, (z) => masks.current.get(z.id) ?? null, W, H))
+      : baseImg;
     const dessin = (fond: CanvasImageSource | null, opts: { noShadows?: boolean; foregroundErase?: boolean }) => {
       const c = newCanvas(W, H);
       drawComposition(c.getContext("2d")!, {
@@ -1011,7 +1032,7 @@ export function Workspace({
           items={scene.items}
           asset={assetFor}
           foreground={foreground}
-          overlay={overlay}
+          overlay={overlay ?? apercuSurvol}
           overlayLabel={overlayLabel}
           selected={selectedUid}
           tool={tool}
@@ -1028,6 +1049,11 @@ export function Workspace({
             void onClickImage(p);
           }}
           onQuadChange={(q: Quad) => activeZone && api.updateZone(activeZone.id, { quad: q })}
+          onHoverImage={(p) => {
+            if (tool !== "peindre" || !pinceau) return;
+            const id = p && p[0] >= 0 && p[1] >= 0 && p[0] < W && p[1] < H ? (surfaceSous(p)?.id ?? null) : null;
+            if (id !== survol) setSurvol(id);
+          }}
         />
         {(busy || finishing) && (
           <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">

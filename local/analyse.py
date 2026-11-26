@@ -212,10 +212,15 @@ def _etendre_sous_objets(img, mur, objets):
     graines = cv2.erode(m.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
     graines &= cv2.dilate(bord.astype(np.uint8), np.ones((9, 9), np.uint8)) > 0
     pousse = (selectionner(img, graines, interdit, 0.8) > 0.5) & objets
+    # Débordement seulement : une bande étroite autour du mur reconnu. Un meuble entier de
+    # la couleur du mur (fauteuil beige devant un mur beige) n'est jamais rattaché au mur.
+    H, W = m.shape
+    dist = cv2.distanceTransform((~m).astype(np.uint8), cv2.DIST_L2, 3)
+    pousse &= dist <= 0.025 * max(H, W)
     return np.maximum(mur, pousse.astype(np.float32))
 
 
-def _plan(pan, prof, coeur, voisins=None):
+def _plan(pan, prof, coeur, voisins=None, suspect=None):
     """Garde les pixels d'un pan dont la profondeur suit le plan du mur : l'inverse de la
     profondeur d'un plan est affine dans l'image. Un morceau de plafond ou de sol pris
     pour du mur s'en écarte nettement."""
@@ -243,35 +248,95 @@ def _plan(pan, prof, coeur, voisins=None):
         bord = cv2.dilate(voisins.astype(np.uint8), np.ones((7, 7), np.uint8)) > 0
         lies = np.unique(lab[bord & hors])
         hors = np.isin(lab, lies[lies > 0])
+    if suspect is not None:
+        # On ne retire que ce que le modèle soupçonne d'être du plafond ou du sol : deux
+        # murs pris pour un seul pan (mur du fond + mur d'ascenseur) restent des murs.
+        hors &= suspect
     return pan * ~hors
 
 
-def _plinthes(img, mur, sol):
-    """Bande basse du mur, au contact du sol, d'une autre couleur que le mur (plinthe) :
-    retirée du mur pour ne pas être repeinte."""
-    H, W = mur.shape
-    if sol is None:
-        return mur
+def _plinthes(img, sol, interdit):
+    """Plinthes : bande basse posée sur le sol, sous un mur ou un habillage, délimitée en
+    haut par une arête nette (changement de couleur). Recherche colonne par colonne
+    juste au-dessus du bord du sol ; hauteur entre 0,5 % et 5 % de l'image ; on garde
+    les tronçons continus (une plinthe court le long du mur)."""
+    H, W = sol.shape
+    s_ = sol > 0.5
+    if s_.sum() < 0.01 * H * W:
+        return np.zeros((H, W), np.float32)
+    lab = cv2.cvtColor(cv2.GaussianBlur(img, (0, 0), 1.2), cv2.COLOR_BGR2LAB).astype(np.float32)
+    haut_sol = np.where(s_.any(0), s_.argmax(0), -1)
+    hmin, hmax = max(3, int(0.005 * H)), max(6, int(0.05 * H))
+    hauteur = np.zeros(W, np.int32)
+    for x in range(W):
+        y0 = haut_sol[x]
+        if y0 < hmax + 4 or interdit[y0 - 2, x]:
+            continue
+        col = lab[y0 - hmax - 3:y0, x]
+        # arête la plus forte dans la bande (différence entre 3 px au-dessus et au-dessous)
+        d = np.linalg.norm(col[6:] - col[:-6], axis=1)
+        if not len(d):
+            continue
+        k = int(np.argmax(d))
+        if d[k] < 14:
+            continue
+        h = (len(col) - (k + 3))
+        if hmin <= h <= hmax:
+            # la plinthe elle-même est d'une couleur à peu près uniforme
+            bande = lab[y0 - h + 1:y0 - 1, x]
+            if len(bande) >= 2 and float(np.std(bande[:, 0])) < 14:
+                hauteur[x] = h
+    # lissage le long du mur et tronçons continus
+    hl = cv2.medianBlur(hauteur.astype(np.uint8).reshape(1, -1) if hmax < 255 else hauteur.reshape(1, -1).astype(np.uint8), 9).ravel().astype(np.int32)
+    ok = hl > 0
+    plinthe = np.zeros((H, W), bool)
+    debut = None
+    for x in range(W + 1):
+        if x < W and ok[x]:
+            debut = x if debut is None else debut
+            continue
+        if debut is not None and x - debut >= 0.03 * W:
+            xs = np.arange(debut, x)
+            haut = haut_sol[xs] - hl[xs]
+            a, b0 = np.polyfit(xs, haut, 1)
+            # Une plinthe est droite : le pied arrondi d'un fauteuil ou d'un pouf ne l'est pas.
+            if float(np.std(haut - (a * xs + b0))) > 0.004 * H:
+                debut = None
+                continue
+            for xx in range(debut, x):
+                y0 = haut_sol[xx]
+                plinthe[max(0, y0 - hl[xx]):y0, xx] = True
+        debut = None
+    return cv2.GaussianBlur(plinthe.astype(np.float32), (0, 0), 0.8)
+
+
+def _portes(img, portes, ep_rel=0.045):
+    """Une surface par porte (composantes séparées) ; l'huisserie devient un « cadre »
+    quand sa couleur se distingue du vantail."""
+    from finitions import separer_cadre
+    H, W = portes.shape
+    b = (portes > 0.5).astype(np.uint8)
+    n, lab_c, st, _ = cv2.connectedComponentsWithStats(b, connectivity=8)
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB).astype(np.float32)
-    m = mur > 0.5
-    contact = m & (cv2.dilate((sol > 0.5).astype(np.uint8), np.ones((9, 9), np.uint8)) > 0)
-    if contact.sum() < 20:
-        return mur
-    hauteur = max(4, round(0.045 * H))
-    bande = cv2.dilate(contact.astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_RECT, (3, 2 * hauteur + 1)), anchor=(1, 2 * hauteur)) > 0
-    bande &= m
-    reste = m & ~bande
-    if reste.sum() < 100:
-        return mur
-    ref = np.median(lab[reste], axis=0)
-    diff = np.sqrt(((lab - ref) ** 2).sum(2))
-    seuil = max(12.0, float(np.percentile(np.sqrt(((lab[reste] - ref) ** 2).sum(1)), 90)) * 1.3)
-    plinthe = bande & (diff > seuil)
-    plinthe = cv2.morphologyEx(plinthe.astype(np.uint8), cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, (9, 1))) > 0
-    return mur * ~plinthe
+    out = []
+    for i in sorted(range(1, n), key=lambda i: st[i, 0]):
+        x, y, w, h, aire = st[i]
+        if aire < 0.004 * H * W:
+            continue
+        m = portes * (lab_c == i)
+        ep = max(4, int(round(ep_rel * w)))
+        feuille, cadre = separer_cadre(m, ep)
+        fs, cs = feuille > 0.5, cadre > 0.5
+        if cs.sum() > 50 and fs.sum() > 50:
+            diff = float(np.linalg.norm(np.median(lab[fs], axis=0) - np.median(lab[cs], axis=0)))
+            if diff > 10:
+                out.append((feuille, cadre))
+                continue
+        out.append((m, None))
+    return out
 
 
-def _vers_plafond(img, pan, plafond):
+def _vers_plafond(img, pan, plafond, proba_plafond):
     """Haut d'un pan de mur qui a la couleur du plafond (bandeau sous un plafond uni, mal
     classé) : rendu au plafond. Le pan est comparé à sa propre couleur ; dans chaque
     colonne, on ne prend que la suite continue de pixels « plafond » depuis le haut."""
@@ -300,10 +365,66 @@ def _vers_plafond(img, pan, plafond):
     rupture = np.where((m & ~proche).any(0), (m & ~proche).argmax(0), H)
     yy = np.arange(H)[:, None]
     deplace = proche & (yy >= premier[None, :]) & (yy < rupture[None, :])
+    # Seulement là où le modèle envisage lui-même un plafond : un mur clair sous un
+    # plafond clair (couleurs proches) n'est jamais déplacé.
+    deplace &= proba_plafond > 0.15
     deplace = cv2.morphologyEx(deplace.astype(np.uint8), cv2.MORPH_OPEN, np.ones((5, 5), np.uint8)) > 0
     if deplace.sum() < 0.002 * H * W:
         return pan, plafond
     return pan * ~deplace, np.maximum(plafond, deplace.astype(np.float32))
+
+
+def _par_couleur(img, pan, ecart=12.0, min_part=0.12):
+    """Un pan qui réunit deux revêtements de couleurs franchement différentes (mur beige
+    et habillage bleu-gris, mur d'accent) est séparé en deux surfaces : un clic sur le
+    beige ne peint que le beige. La luminosité compte peu (lumière de fenêtre)."""
+    m = pan > 0.5
+    n = int(m.sum())
+    if n < 2000:
+        return [pan]
+    lab = cv2.cvtColor(cv2.GaussianBlur(img, (0, 0), 2), cv2.COLOR_BGR2LAB).astype(np.float32)
+    # Teinte seule (direction a/b), plafonnée : un même jaune au soleil et à l'ombre change
+    # de clarté et de saturation mais pas de teinte ; beige et bleu-gris s'opposent.
+    ab = lab[m][:, 1:] - 128.0
+    c = np.linalg.norm(ab, axis=1, keepdims=True)
+    v = (ab * np.minimum(c, 15.0) / np.maximum(c, 1e-3)).astype(np.float32)
+    ech = v[:: max(1, n // 40000)]
+    crit = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 0.5)
+    cv2.setRNGSeed(0)
+    _, _, centres = cv2.kmeans(ech, 2, None, crit, 3, cv2.KMEANS_PP_CENTERS)
+    if np.linalg.norm(centres[0] - centres[1]) < ecart:
+        return [pan]
+    lab_px = np.argmin(((v[:, None, :] - centres[None, :, :]) ** 2).sum(2), axis=1)
+    carte = np.full(m.shape, -1, np.int32)
+    carte[m] = lab_px
+    parts = []
+    for k in (0, 1):
+        g = (carte == k).astype(np.uint8)
+        g = cv2.morphologyEx(g, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+        nc, lc, st, _ = cv2.connectedComponentsWithStats(g, connectivity=8)
+        if nc <= 1:
+            parts.append(np.zeros(m.shape, bool))
+            continue
+        # La plus grande zone de cette teinte, plus celles presque aussi grandes ; un îlot
+        # (bas de mur à l'ombre, reflet) revient à l'autre teinte.
+        plus_grande = int(st[1:, 4].max())
+        garde = st[:, 4] >= max(0.02 * n, 0.3 * plus_grande)
+        garde[0] = False
+        parts.append(garde[lc])
+    if min(p.sum() for p in parts) < min_part * n:
+        return [pan]
+    # Les pixels non attribués (bords, petits îlots) vont à la partie voisine la plus proche.
+    reste = m & ~parts[0] & ~parts[1]
+    if reste.any():
+        d0 = cv2.distanceTransform((~parts[0]).astype(np.uint8), cv2.DIST_L2, 3)
+        d1 = cv2.distanceTransform((~parts[1]).astype(np.uint8), cv2.DIST_L2, 3)
+        parts[0] = parts[0] | (reste & (d0 <= d1))
+        parts[1] = parts[1] | (reste & (d1 < d0))
+    out = []
+    for q in parts:
+        doux = cv2.GaussianBlur(q.astype(np.float32), (0, 0), 1.0)
+        out.append(np.minimum(pan, doux))
+    return out
 
 
 def analyser(img):
@@ -345,17 +466,22 @@ def analyser(img):
     zones = []
     if 'mur' in masques:
         coeur = pg_full[groupes.index('mur')] > 0.6
-        masques['mur'] = _plinthes(img, masques['mur'], masques.get('sol'))
+        if 'sol' in masques:
+            interdit = (masques['porte'] > 0.5) if 'porte' in masques else np.zeros((H, W), bool)
+            masques['plinthe'] = _plinthes(img, masques['sol'], interdit)
+            masques['mur'] = masques['mur'] * (1 - masques['plinthe'])
         voisins = np.zeros((H, W), bool)
         for g in ('plafond', 'sol'):
             if g in masques:
                 voisins |= masques[g] > 0.5
-        pans = [_plan(m, prof, coeur, voisins) for m in pans_de_mur(masques['mur'], prof, img)]
+        suspect = (pg_full[groupes.index('plafond')] + pg_full[groupes.index('sol')]) > 0.15
+        pans = [_plan(m, prof, coeur, voisins, suspect) for m in pans_de_mur(masques['mur'], prof, img)]
         for i, m in enumerate(pans):
-            pans[i], plaf = _vers_plafond(img, m, masques.get('plafond'))
+            pans[i], plaf = _vers_plafond(img, m, masques.get('plafond'), pg_full[groupes.index('plafond')])
             if plaf is not None:
                 masques['plafond'] = plaf
         pans = [m for m in pans if (m > 0.5).sum() > 0.003 * H * W]
+        pans = [q for m in pans for q in _par_couleur(img, m)]
         infos = []
         for m in pans:
             sel = m > 0.5
@@ -378,9 +504,17 @@ def analyser(img):
             vus[z['nom']] = vus.get(z['nom'], 0) + 1
             if vus[z['nom']] > 1:
                 z['nom'] += f" {vus[z['nom']]}"
-    for g, nom in (('plafond', 'Plafond'), ('sol', 'Sol'), ('porte', 'Portes')):
-        if g in masques and (masques[g] > 0.5).mean() >= (0.008 if g == 'porte' else 0.003):
-            zones.append({'nom': nom, 'surface': g, 'masque': masques[g], 'profondeur': float(np.median(prof[masques[g] > 0.5]))})
+    pm = lambda m: float(np.median(prof[m > 0.5])) if (m > 0.5).any() else 0.0
+    for g, nom in (('plafond', 'Plafond'), ('sol', 'Sol')):
+        if g in masques and (masques[g] > 0.5).mean() >= 0.003:
+            zones.append({'nom': nom, 'surface': g, 'masque': masques[g], 'profondeur': pm(masques[g])})
+    if 'plinthe' in masques and (masques['plinthe'] > 0.5).mean() >= 0.001:
+        zones.append({'nom': 'Plinthes', 'surface': 'plinthe', 'masque': masques['plinthe'], 'profondeur': pm(masques['plinthe'])})
+    if 'porte' in masques:
+        for k, (feuille, cadre) in enumerate(_portes(img, masques['porte']), 1):
+            zones.append({'nom': f'Porte {k}', 'surface': 'porte', 'masque': feuille, 'profondeur': pm(feuille)})
+            if cadre is not None:
+                zones.append({'nom': f'Cadre porte {k}', 'surface': 'cadre', 'masque': cadre, 'profondeur': pm(cadre)})
     elements = {g: round(float((lab == groupes.index(g)).mean() * 100), 1) for g in groupes}
     t4 = time.perf_counter()
     return {

@@ -110,6 +110,7 @@ function lireUsage(v: string): Surface | null {
   if (s.startsWith("plafond")) return "plafond";
   if (s.startsWith("porte")) return "porte";
   if (s.startsWith("cadre") || s.startsWith("huisserie") || s.startsWith("menuiserie")) return "cadre";
+  if (s.startsWith("plinthe")) return "plinthe";
   if (s.startsWith("sol") || s.startsWith("parquet")) return "sol";
   return "autre";
 }

@@ -55,6 +55,35 @@ export async function renderFinished(basePath: string, payload: Record<string, u
   return loadImage(URL.createObjectURL(blob));
 }
 
+/** Aperçu à l'écran : photo et sélections réduites à « cote » pixels au plus (le clic
+ *  reste rapide sur une grande photo) ; la pleine résolution sert à l'export. */
+export async function renderFinishedApercu(
+  base: HTMLImageElement,
+  zones: Zone[],
+  mask: (z: Zone) => HTMLCanvasElement | null,
+  W: number,
+  H: number,
+  cote: number,
+  signal?: AbortSignal,
+) {
+  const s = Math.min(1, cote / Math.max(W, H));
+  const w = Math.round(W * s), h = Math.round(H * s);
+  const reduit = (src: CanvasImageSource) => {
+    const c = newCanvas(w, h);
+    c.getContext("2d")!.drawImage(src, 0, 0, w, h);
+    return c;
+  };
+  const petits = new Map<string, HTMLCanvasElement>();
+  for (const z of zones) {
+    const m = mask(z);
+    if (m) petits.set(z.id, reduit(m));
+  }
+  const payload = await finishPayload(zones, (z) => petits.get(z.id) ?? null, w, h);
+  const image = await canvasToDataUrl(reduit(base), "image/jpeg", 0.92);
+  const blob = await photoEngine({ image, mode: "finish", zones: payload }, signal);
+  return loadImage(URL.createObjectURL(blob));
+}
+
 /** Compose une variante enregistrée telle qu'elle sera remise au client. */
 export async function composeVariant(
   row: { base_path: string; width: number; height: number; data: string },

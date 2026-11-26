@@ -14,7 +14,7 @@ import type { StageTool } from "@/components/studio/stage";
 
 const KINDS = ["peinture", "papier", "enduit"] as const;
 const TAB_LABEL: Record<(typeof KINDS)[number], string> = { peinture: "Peintures", papier: "Papiers & sols", enduit: "Chaux & enduits" };
-const AJOUTS: Surface[] = ["mur", "plafond", "porte", "sol", "autre"];
+const AJOUTS: Surface[] = ["mur", "plafond", "porte", "cadre", "plinthe", "sol", "autre"];
 const TOUTES = "toutes";
 
 function Swatch({ color, texture, className }: { color: string | null; texture: string | null; className?: string }) {

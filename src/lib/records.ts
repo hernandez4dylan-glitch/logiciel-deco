@@ -82,7 +82,7 @@ export interface StudioRows {
     finition: string | null;
     marque: string | null;
     gamme: string | null;
-    usage: "mur" | "plafond" | "porte" | "cadre" | "sol" | "autre" | null;
+    usage: "mur" | "plafond" | "porte" | "cadre" | "plinthe" | "sol" | "autre" | null;
     created_at: string;
     updated_at: string;
   };

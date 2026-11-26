@@ -119,6 +119,22 @@ Demande : les 4 propositions ne servent à rien et font perdre du temps ; la sé
 - Vérifié dans le navigateur sur données de test : 2 clics = 2 murs peints, vase posé d'un clic sur un tabouret,
   fenêtre d'export (aperçu, PNG, consigne).
 
+## Détail des pièces et fluidité (26/11/2026)
+Demande : détailler plinthes, portes, cadres, murs et plafond de chaque pièce. Essai sur une vraie photo de
+l'utilisateur (couloir 2400 × 1800 : habillage bleu-gris, mur beige, ascenseur, porte coupe-feu).
+- [x] Surfaces fines : plinthes (bande droite au-dessus du sol, arête nette), une surface par porte, cadre
+  séparé quand sa couleur diffère du vantail, pans de mur séparés aussi par la teinte (beige / bleu-gris).
+- [x] Corrigé sur la vraie photo : mur beige rendu au plafond (réattribution limitée aux pixels que le modèle
+  soupçonne être du plafond), bandes de mur perdues (contrôle de plan limité au plafond/sol suspects),
+  mur jaune coupé entre ombre et soleil (séparation par la teinte seulement), fausses plinthes au pied des
+  fauteuils (une plinthe est droite), fauteuil beige rattaché au mur beige (extension limitée à 2,5 %).
+- [x] Survol : la surface visée s'affiche dans la teinte choisie, avec son nom.
+- [x] Fluidité : aperçu à l'écran calculé à 1400 px au plus ; un clic de peinture s'affiche en ≈ 5 s au premier
+  passage sur une photo de 2400 px puis en moins d'une seconde ; la pleine résolution est calculée à l'export.
+- Vérifié dans le navigateur sur la photo du couloir : mur du fond, porte, cadre, mur gauche et plinthes peints
+  chacun d'un clic ; 51 tests Python, 40 tests d'écrans.
+- Limite : une plinthe ou un cadre fin se vise mieux après un zoom ; le cadre est une bande d'épaisseur estimée.
+
 ## Tâches
 - [x] Vérification automatique installée (.claude/hooks/verifier.ps1 + .claude/settings.json)
 - [x] Base : migrations sans perte (teintes/matières, photos d'article, projets, variantes) + tests

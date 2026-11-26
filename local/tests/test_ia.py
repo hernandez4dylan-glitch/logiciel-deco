@@ -31,6 +31,20 @@ class DecoupeTests(unittest.TestCase):
         self.assertEqual(analyse._segments(x, 0.2 + 0.5 * x + np.random.default_rng(1).normal(0, 0.003, x.size)), [])
 
 
+class PlintheTests(unittest.TestCase):
+    def test_plinthe_droite_trouvee_pied_arrondi_ignore(self):
+        H, W = 400, 600
+        img = np.full((H, W, 3), (150, 170, 190), np.uint8)       # mur
+        img[300:] = (90, 110, 130)                                 # sol
+        img[284:300, :] = (235, 235, 235)                          # plinthe blanche droite
+        cv2.ellipse(img, (300, 300), (80, 30), 0, 180, 360, (40, 40, 40), -1)  # pied arrondi d'un meuble
+        sol = np.zeros((H, W), np.float32)
+        sol[300:] = 1
+        pl = analyse._plinthes(img, sol, np.zeros((H, W), bool)) > 0.5
+        self.assertGreater(pl[286:298, 20:200].mean(), 0.8, 'plinthe trouvée')
+        self.assertLess(pl[200:280, :].mean(), 0.01, 'le mur reste un mur')
+
+
 class OptimisationSansModeleTests(unittest.TestCase):
     def test_planificateur_lcm(self):
         ts = optimisation.pas_lcm(3, 0.45)

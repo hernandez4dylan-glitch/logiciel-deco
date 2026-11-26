@@ -61,9 +61,14 @@ Ouvrez « Espace Pro Décorateurs », puis « Studio Plan & 3D ».
    de la pièce. Le format est conservé (panoramique, vertical) ; l’image est
    seulement réduite à 2400 pixels sur le grand côté. Sans image, une pièce
    vierge est générée.
-   Dès l'ouverture, l'IA locale reconnaît la pièce (une seule fois, 10 à 20 s) :
-   chaque pan de mur, le plafond, le sol et les portes ; fenêtres, plinthes,
-   tableaux et meubles sont laissés de côté.
+   Dès l'ouverture, l'IA locale reconnaît la pièce (une seule fois, 10 à 20 s) et
+   la découpe en surfaces : chaque pan de mur (séparé aussi quand deux revêtements
+   de teintes différentes se côtoient, par exemple un habillage bleu-gris et un mur
+   beige), le plafond, le sol, les plinthes, chaque porte et son cadre (quand le
+   cadre a sa propre couleur). Fenêtres, tableaux et meubles sont laissés de côté.
+   En survolant la photo avec une teinte choisie, la surface visée s'affiche dans
+   cette teinte et son nom apparaît (« Cliquez pour peindre « Plinthes » ») :
+   zoomez à la molette pour viser une plinthe ou un cadre fin.
    PEINDRE : onglet « Murs », 1. cliquez sur une teinte (ou une chaux, un papier
    peint, un sol), 2. cliquez sur la photo : le mur, le plafond, le sol ou la
    porte visé prend la teinte, lumière conservée. Chaque clic peint une surface ;

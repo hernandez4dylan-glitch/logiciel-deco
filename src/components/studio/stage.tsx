@@ -50,6 +50,7 @@ export function Stage({
   onStrokeEnd,
   onClickImage,
   onQuadChange,
+  onHoverImage,
 }: {
   ref?: Ref<StageHandle>;
   W: number;
@@ -72,6 +73,8 @@ export function Stage({
   onStrokeEnd: () => void;
   onClickImage: (p: Point) => void;
   onQuadChange: (q: Quad) => void;
+  /** Position survolée (coordonnées image), null en sortant : aperçu avant le clic. */
+  onHoverImage?: (p: Point | null) => void;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
@@ -231,6 +234,7 @@ export function Stage({
   function move(e: RPE<HTMLCanvasElement>) {
     const p = pos(e);
     if (BRUSH_TOOLS.includes(tool)) setHover(p);
+    if (!drag.current) onHoverImage?.(p);
     const d = drag.current;
     if (!d) return;
     if (d.kind === "pan") {
@@ -282,7 +286,10 @@ export function Stage({
         onPointerMove={move}
         onPointerUp={up}
         onPointerCancel={up}
-        onPointerLeave={() => setHover(null)}
+        onPointerLeave={() => {
+          setHover(null);
+          onHoverImage?.(null);
+        }}
         onWheel={wheel}
         onContextMenu={(e) => e.preventDefault()}
       />
