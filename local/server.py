@@ -35,8 +35,11 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('X-Content-Type-Options','nosniff')
         self.send_header('Content-Security-Policy',"default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' data: blob:; font-src 'self' data:; frame-ancestors 'none'")
         if filename: self.send_header('Content-Disposition',f'attachment; filename="{filename}"')
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.end_headers()
+            self.wfile.write(body)
+        except (ConnectionAbortedError,ConnectionResetError,BrokenPipeError):
+            pass  # l'écran a annulé la demande (aperçu remplacé par un plus récent) : rien à faire
     def allowed(self,write=False):
         authority=f'127.0.0.1:{self.server.server_port}'
         return self.headers.get('Host')==authority and (not write or self.headers.get('Origin')=='http://'+authority)
