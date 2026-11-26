@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { ProductImage } from "@/components/app/product-image";
 import { ProductPhotosDialog, productPhotoChoices, saveCutout } from "@/components/app/product-photos-dialog";
 import { cn } from "@/lib/utils";
+import { ImportVisuel } from "@/components/decor/import-visuel";
 import { photoEngine, photoUrl, pathToDataUrl } from "@/lib/studio-api";
 import type { WorkspaceApi } from "@/components/studio/workspace";
 
@@ -204,6 +205,8 @@ export function PanelArticles({ api }: { api: WorkspaceApi }) {
 
       <section className="grid gap-2">
         <p className="font-medium">Catalogue</p>
+        <p className="text-xs text-muted-foreground">Glissez un article dans la pièce (ou cliquez dessus puis sur la photo).</p>
+        <ImportVisuel products={api.products} onAjoute={api.addItemPhoto} />
         <div className="relative">
           <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input className="h-8 pl-8" placeholder="Nom ou référence" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Rechercher un article" />
@@ -211,7 +214,17 @@ export function PanelArticles({ api }: { api: WorkspaceApi }) {
         <ul className="grid max-h-80 gap-1 overflow-auto pr-1">
           {filtered.map((p) => (
             <li key={p.id}>
-              <button type="button" onClick={() => api.addItem(p)} className="flex w-full items-center gap-2 rounded-md border p-1.5 text-left text-xs hover:border-primary">
+              <button
+                type="button"
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("text/x-produit", p.id);
+                  e.dataTransfer.effectAllowed = "copy";
+                }}
+                onClick={() => api.addItem(p)}
+                title="Glissez-le dans la pièce, ou cliquez puis cliquez sur la photo"
+                className="flex w-full cursor-grab items-center gap-2 rounded-md border p-1.5 text-left text-xs hover:border-primary active:cursor-grabbing"
+              >
                 <ProductImage src={p.cutout_url ?? p.image_url} alt={p.name} className="h-10 w-10 shrink-0 bg-transparent [&_img]:object-contain" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{p.name}</span>

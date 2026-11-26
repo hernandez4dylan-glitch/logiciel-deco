@@ -82,7 +82,11 @@ export interface StudioRows {
     finition: string | null;
     marque: string | null;
     gamme: string | null;
-    usage: "mur" | "plafond" | "porte" | "cadre" | "plinthe" | "sol" | "autre" | null;
+    usage: "mur" | "plafond" | "porte" | "cadre" | "plinthe" | "fenetre" | "sol" | "autre" | null;
+    prix_ttc?: number | null;
+    unite?: string | null;
+    m2_par_unite?: number | null;
+    couches?: number | null;
     created_at: string;
     updated_at: string;
   };

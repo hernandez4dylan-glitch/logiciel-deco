@@ -98,6 +98,8 @@ describe("composition enregistrée", () => {
           surface: "porte",
           aspect: "brillant",
           auto: true,
+          m2: 24.5,
+          rotation: 90,
         },
       ],
     };
@@ -107,7 +109,7 @@ describe("composition enregistrée", () => {
     expect(vieux.items[0]!.x).toBe(1.5);
     expect(vieux.items[0]!.shadow.opacity).toBeGreaterThan(0);
     expect(vieux.zones[0]!.finish).toBeNull();
-    expect(vieux.zones[0]).toMatchObject({ surface: "mur", aspect: null, auto: false });
+    expect(vieux.zones[0]).toMatchObject({ surface: "mur", aspect: null, auto: false, m2: null, rotation: 0 });
   });
   it("duplique une variante sans lien avec l'originale", () => {
     const s: Scene = { ...newScene(), items: [item()] };
@@ -139,11 +141,11 @@ describe("références et quantités", () => {
       ...newScene(),
       items: [item({ uid: "1" }), item({ uid: "2" }), item({ uid: "3", productId: "p2" }), item({ uid: "4", productId: "inconnu" })],
       zones: [
-        { id: "z1", name: "Mur du fond", mask: "m1.png", finish: beige, quad: null, repetitions: 4, lumiere: 1, visible: true, surface: "mur", aspect: null, auto: false },
-        { id: "z2", name: "Mur gauche", mask: "m2.png", finish: beige, quad: null, repetitions: 4, lumiere: 1, visible: true, surface: "mur", aspect: null, auto: false },
-        { id: "z3", name: "Brouillon", mask: null, finish: { ...beige, id: "g", kind: "papier", name: "Motif", reference: "PP-1", color: null, texture: "t.png" }, quad: null, repetitions: 4, lumiere: 1, visible: true, surface: "mur", aspect: null, auto: false },
+        { id: "z1", name: "Mur du fond", mask: "m1.png", finish: beige, quad: null, repetitions: 4, lumiere: 1, visible: true, surface: "mur", aspect: null, auto: false, m2: null, rotation: 0 },
+        { id: "z2", name: "Mur gauche", mask: "m2.png", finish: beige, quad: null, repetitions: 4, lumiere: 1, visible: true, surface: "mur", aspect: null, auto: false, m2: null, rotation: 0 },
+        { id: "z3", name: "Brouillon", mask: null, finish: { ...beige, id: "g", kind: "papier", name: "Motif", reference: "PP-1", color: null, texture: "t.png" }, quad: null, repetitions: 4, lumiere: 1, visible: true, surface: "mur", aspect: null, auto: false, m2: null, rotation: 0 },
         // Même teinte sur une porte : finition satinée par défaut, donc ligne séparée.
-        { id: "z4", name: "Porte", mask: "m4.png", finish: { ...beige, finition: null }, quad: null, repetitions: 4, lumiere: 1, visible: true, surface: "porte", aspect: null, auto: false },
+        { id: "z4", name: "Porte", mask: "m4.png", finish: { ...beige, finition: null }, quad: null, repetitions: 4, lumiere: 1, visible: true, surface: "porte", aspect: null, auto: false, m2: null, rotation: 0 },
       ],
     };
     const list = referenceList(s, products, { pro: true, discount: 10 });

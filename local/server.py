@@ -85,6 +85,11 @@ class Handler(BaseHTTPRequestHandler):
                 # Analyse de pièce et optimisation : réponse JSON (zones, durées) ; sinon une image PNG.
                 if isinstance(out,dict): return self.reply(200,json.dumps({'data':out,'error':None}).encode(),'application/json')
                 return self.reply(200,out,'image/png')
+            elif self.path=='/api/pdf':
+                from pdf import proposition
+                d=json.loads(raw)
+                nom=re.sub(r'[^A-Za-z0-9 _-]+','',str(d.get('fichier') or 'proposition'))[:80].strip() or 'proposition'
+                return self.reply(200,proposition(d),'application/pdf',filename=nom+'.pdf')
             elif self.path=='/api/data':
                 with GATE, closing(dbopen()) as db, db:
                     result=dispatch(db,json.loads(raw))

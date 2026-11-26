@@ -44,6 +44,31 @@ class PlintheTests(unittest.TestCase):
         self.assertGreater(pl[286:298, 20:200].mean(), 0.8, 'plinthe trouvée')
         self.assertLess(pl[200:280, :].mean(), 0.01, 'le mur reste un mur')
 
+    def test_plinthe_interrompue_raccordee_jusqu_au_bord(self):
+        H, W = 400, 600
+        img = np.full((H, W, 3), (150, 170, 190), np.uint8)       # mur
+        img[300:] = (90, 110, 130)                                 # sol
+        img[284:300, :] = (235, 235, 235)                          # plinthe
+        img[284:300, 280:320] = (205, 205, 205)                    # reflet : arête brouillée
+        img[278:300, 280:320] = (205, 205, 205)
+        sol = np.zeros((H, W), np.float32)
+        sol[300:] = 1
+        mur = np.zeros((H, W), bool)
+        mur[:300] = True
+        pl = analyse._plinthes(img, sol, np.zeros((H, W), bool), mur) > 0.5
+        self.assertGreater(pl[288:298, :].mean(), 0.95, 'plinthe continue, raccordée et prolongée')
+        self.assertLess(pl[200:276, :].mean(), 0.01)
+
+
+class FlouTests(unittest.TestCase):
+    def test_grand_flou_reduit_fidele(self):
+        import finitions
+        rng = np.random.default_rng(0)
+        x = cv2.GaussianBlur(rng.random((900, 1200)).astype(np.float32), (0, 0), 6)
+        x[:, 600:] += 0.5
+        exact = cv2.GaussianBlur(x, (0, 0), 30)
+        self.assertLess(float(np.abs(finitions._flou(x, 30) - exact)[60:-60, 60:-60].max()), 0.02)
+
 
 class OptimisationSansModeleTests(unittest.TestCase):
     def test_planificateur_lcm(self):

@@ -3,7 +3,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { ProductImage } from "@/components/app/product-image";
-import { Studio } from "@/components/pro/studio";
+import { EspaceDecorateur } from "@/components/decor/espace-decorateur";
 import { Advisor } from "@/components/pro/advisor";
 import { DecoratorForm } from "@/components/pro/decorator-form";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +14,7 @@ import { decoratorsQuery, productsQuery } from "@/lib/data";
 import { eur } from "@/lib/format";
 
 const TITLE = "Espace Pro Décorateurs — Un Instant Chez Moi";
-const DESC = "Catalogue aux tarifs Pro, Studio Plan & 3D et décorateurs partenaires.";
+const DESC = "Espace décorateur (photo du client, finitions et objets du catalogue, liste d'achat et PDF), catalogue aux tarifs Pro et décorateurs partenaires.";
 
 export const Route = createFileRoute("/_authenticated/espace-pro")({
   head: () => ({
@@ -57,12 +57,12 @@ function Page() {
       />
       <Tabs defaultValue="studio">
         <TabsList className="mb-4">
-          <TabsTrigger value="studio">Studio Plan & 3D</TabsTrigger>
+          <TabsTrigger value="studio">Espace décorateur</TabsTrigger>
           <TabsTrigger value="conseiller">Conseiller local</TabsTrigger>
           <TabsTrigger value="catalogue">Catalogue Pro</TabsTrigger>
           <TabsTrigger value="partenaires">Décorateurs partenaires</TabsTrigger>
         </TabsList>
-        <TabsContent value="studio"><Studio products={products} discount={discount} /></TabsContent>
+        <TabsContent value="studio"><EspaceDecorateur products={products} discount={discount} /></TabsContent>
         <TabsContent value="conseiller"><Advisor products={products} discount={discount} /></TabsContent>
         <TabsContent value="catalogue">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

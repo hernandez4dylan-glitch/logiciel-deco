@@ -175,10 +175,11 @@ def _tuile(tex, mode):
     return tex
 
 
-def texture_plan(tex, quad, shape, repetitions, mode='repeter'):
+def texture_plan(tex, quad, shape, repetitions, mode='repeter', rotation=0.0):
     """Plaque la texture en perspective : `quad` = 4 coins (x, y) en pixels de l'image,
     dans l'ordre haut-gauche, haut-droit, bas-droit, bas-gauche, correspondant à un
-    rectangle du mur. `repetitions` = nombre de motifs sur la largeur du rectangle."""
+    rectangle du mur. `repetitions` = nombre de motifs sur la largeur du rectangle ; `rotation` (degrés) tourne
+    le motif dans le plan du mur ou du sol (sens des lames d'un parquet)."""
     H, W = shape
     q = np.array(quad, np.float32)
     largeur = (np.linalg.norm(q[1] - q[0]) + np.linalg.norm(q[2] - q[3])) / 2
@@ -188,7 +189,8 @@ def texture_plan(tex, quad, shape, repetitions, mode='repeter'):
     if mode == 'miroir':
         tw, th = tw // 2, th // 2  # une « répétition » = une tuile d'origine
     # Résolution du plan : assez fine pour la zone la plus proche.
-    px = int(np.clip(max(largeur, hauteur) * 1.5, 256, 4096))
+    tourne = abs(float(rotation) % 360) > 0.01
+    px = int(np.clip(max(largeur, hauteur) * 1.5, 256, 1400 if tourne else 4096))
     rep_u = max(0.05, float(repetitions))
     rep_v = rep_u * (hauteur / max(largeur, 1)) * (tw / max(th, 1))
     # Le plan couvre [-1, 2] × [-1, 2] du rectangle pour remplir tout le mur visible.
@@ -201,8 +203,18 @@ def texture_plan(tex, quad, shape, repetitions, mode='repeter'):
     scale = motif_w / tw
     tt = cv2.resize(t, (max(1, round(t.shape[1] * scale)), max(1, round(t.shape[0] * scale))),
                     interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_CUBIC)
-    ny, nx = ph // tt.shape[0] + 2, pw // tt.shape[1] + 2
-    plan = np.tile(tt, (ny, nx, 1))[:ph, :pw]
+    if tourne:
+        # Coordonnées du plan tournées autour de son centre, motif répété à l'infini.
+        a = np.deg2rad(float(rotation))
+        yy, xx = np.mgrid[0:ph, 0:pw].astype(np.float32)
+        xx -= pw / 2
+        yy -= ph / 2
+        mx = (np.cos(a) * xx + np.sin(a) * yy).astype(np.float32)
+        my = (-np.sin(a) * xx + np.cos(a) * yy).astype(np.float32)
+        plan = cv2.remap(tt, mx, my, cv2.INTER_LINEAR, borderMode=cv2.BORDER_WRAP)
+    else:
+        ny, nx = ph // tt.shape[0] + 2, pw // tt.shape[1] + 2
+        plan = np.tile(tt, (ny, nx, 1))[:ph, :pw]
     src = np.array([[pw / span, ph / span], [2 * pw / span, ph / span],
                     [2 * pw / span, 2 * ph / span], [pw / span, 2 * ph / span]], np.float32)
     M = cv2.getPerspectiveTransform(src, q)
@@ -265,14 +277,23 @@ BRILLANCE = {
 }
 
 # Finition par défaut selon la surface (usage courant des peintres).
-FINITION_SURFACE = {'mur': 'mat', 'plafond': 'mat', 'porte': 'satin', 'cadre': 'satin', 'plinthe': 'satin', 'sol': 'satin', 'autre': 'mat'}
+FINITION_SURFACE = {'mur': 'mat', 'plafond': 'mat', 'porte': 'satin', 'cadre': 'satin', 'plinthe': 'satin', 'fenetre': 'satin', 'sol': 'satin', 'autre': 'mat'}
 # Lissé du support : une porte ou une boiserie laquée est lisse et reflète nettement ;
 # un grand mur ou un plafond enduit, même en satiné, renvoie un reflet bien plus diffus.
-LISSE_SURFACE = {'mur': 0.45, 'plafond': 0.35, 'porte': 1.0, 'cadre': 1.0, 'plinthe': 1.0, 'sol': 0.8, 'autre': 1.0}
+LISSE_SURFACE = {'mur': 0.45, 'plafond': 0.35, 'porte': 1.0, 'cadre': 1.0, 'plinthe': 1.0, 'fenetre': 1.0, 'sol': 0.8, 'autre': 1.0}
 
 
 def _flou(x, sigma):
-    return cv2.GaussianBlur(x, (0, 0), max(0.5, float(sigma)))
+    """Flou gaussien ; un grand rayon (éclairage, ombres larges) est calculé sur une
+    image réduite puis agrandie : même résultat à l'œil, dix à trente fois plus rapide
+    sur une photo de 12 Mpx."""
+    sigma = max(0.5, float(sigma))
+    if sigma < 8:
+        return cv2.GaussianBlur(x, (0, 0), sigma)
+    f = int(sigma // 4)
+    h, w = x.shape[:2]
+    petit = cv2.resize(x, (max(1, round(w / f)), max(1, round(h / f))), interpolation=cv2.INTER_AREA)
+    return cv2.resize(cv2.GaussianBlur(petit, (0, 0), sigma / f), (w, h), interpolation=cv2.INTER_LINEAR)
 
 
 _CACHE_LUMIERE = {}
@@ -396,6 +417,17 @@ def reflet_miroir(lin, m, net):
     return img
 
 
+def _hautes_lumieres(lin, seuil=0.62):
+    """Compression douce des hautes lumières : une teinte claire posée sur un mur sombre
+    très éclairé (soleil, lampe) garderait sinon une tache blanche brûlée. Le dégradé
+    reste visible, la couleur est conservée (on agit sur la luminance)."""
+    y = luminance(lin)
+    au_dela = np.maximum(y - seuil, 0)
+    y2 = np.where(y > seuil, seuil + (1 - seuil) * (1 - np.exp(-au_dela / (1 - seuil))), y)
+    k = np.where(y > 1e-6, y2 / np.maximum(y, 1e-6), 1.0)
+    return lin * k[..., None]
+
+
 def rendre_surface(lin, m, albedo, finition='mat', lumiere=1.0, relief_origine=1.0, verticale=True, scene=None, lisse=1.0):
     """Nouvelle apparence linéaire d'une surface (avant fusion par le masque).
     relief_origine : part du micro-relief de l'ancienne surface à garder (1 pour une
@@ -408,8 +440,27 @@ def rendre_surface(lin, m, albedo, finition='mat', lumiere=1.0, relief_origine=1
     f['relief'] *= relief_origine
     for k in ('spec', 'voile', 'miroir'):
         f[k] *= lisse
-    C, base, detail, _ = lumiere_en_cache(lin, m)
+    C, base, detail, A = lumiere_en_cache(lin, m)
+    if relief_origine < 1:
+        # Nouvelle matière (béton, parquet, papier) : on garde la lumière et les ombres,
+        # pas le dessin de l'ancien revêtement (chevrons, joints) que l'éclairage suivait.
+        w = (m > 0.5).astype(np.float32)
+        lb = np.log(np.maximum(base, 1e-4)).astype(np.float32)
+        sigma = 0.008 * max(H, W)
+        den = _flou(w, sigma)
+        doux = np.where(den > 1e-3, _flou(lb * w, sigma) / np.maximum(den, 1e-3), lb)
+        base = np.exp(doux + (lb - doux) * relief_origine).astype(np.float32)
     base = np.maximum(1 + (base - 1) * float(lumiere), 0.02)
+    # Teinte bien plus claire que l'ancienne (mur rouge → beige) : la photo avait été
+    # exposée pour un mur sombre ; on adoucit les écarts de lumière comme l'aurait fait
+    # l'appareil, sans les effacer (le côté fenêtre reste plus clair).
+    sel_ = m > 0.5
+    if sel_.any():
+        y_old = float(luminance(np.asarray(A, np.float32).reshape(1, 1, 3))[0, 0]) if A is not None else 0.0
+        y_new = float(np.median(luminance(albedo.astype(np.float32))[sel_]))
+        if y_old > 1e-4 and y_new > y_old * 1.4:
+            g = 1.0 / (1.0 + 0.3 * np.log2(y_new / y_old))
+            base = base ** g
     # Profondeur : les finitions brillantes saturent un peu la teinte et creusent les ombres.
     alb = albedo.astype(np.float32)
     ya = luminance(alb)[..., None]
@@ -417,7 +468,7 @@ def rendre_surface(lin, m, albedo, finition='mat', lumiere=1.0, relief_origine=1
     eclair = base ** f['profondeur']
     diffus = alb * C * eclair[:, :, None] * (detail ** f['relief'])[:, :, None]
     if f['spec'] <= 0:
-        return diffus
+        return _hautes_lumieres(diffus)
     # Reflet de la lumière principale : seulement là où la surface est nettement plus
     # éclairée que d'habitude (près de la fenêtre, sous un spot), étalé selon la finition.
     # Valeur absolue : une porte éclairée uniformément n'a pas de tache de reflet.
@@ -444,7 +495,7 @@ def rendre_surface(lin, m, albedo, finition='mat', lumiere=1.0, relief_origine=1
     # Voile : une peinture satinée renvoie un peu de la lumière qu'elle reçoit, sans
     # couleur (aspect laiteux) ; proportionnel à l'éclairage, jamais à l'ancienne teinte.
     voile = f['voile'] * 0.12 * lum_source
-    return diffus * (1 - 0.5 * f['spec'] * h[:, :, None]) + reflet + voile
+    return _hautes_lumieres(diffus * (1 - 0.5 * f['spec'] * h[:, :, None]) + reflet + voile)
 
 
 def separer_cadre(masque, epaisseur):
@@ -492,7 +543,7 @@ def albedo_zone(z, m, shape):
         ys, xs = np.nonzero(m > 0.5)
         quad = [(xs.min(), ys.min()), (xs.max(), ys.min()), (xs.max(), ys.max()), (xs.min(), ys.max())]
     mode = 'miroir' if kind == 'enduit' else 'repeter'
-    plaque = texture_plan(tex[:, :, :3], quad, (H, W), z.get('repetitions') or 4, mode)
+    plaque = texture_plan(tex[:, :, :3], quad, (H, W), z.get('repetitions') or 4, mode, float(z.get('rotation') or 0))
     alb = srgb_lin(plaque).astype(np.float32)
     # La photo d'un motif ou d'un échantillon porte sa propre lumière : on la ramène à
     # une luminosité moyenne neutre pour que seul l'éclairage de la pièce s'applique.

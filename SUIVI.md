@@ -135,6 +135,33 @@ l'utilisateur (couloir 2400 × 1800 : habillage bleu-gris, mur beige, ascenseur,
   chacun d'un clic ; 51 tests Python, 40 tests d'écrans.
 - Limite : une plinthe ou un cadre fin se vise mieux après un zoom ; le cadre est une bande d'épaisseur estimée.
 
+## Espace décorateur refait (26/11/2026)
+Demande : reprendre entièrement l'onglet ; garder l'outil d'objets, le catalogue et les projets existants.
+- [x] Accueil « Importer une photo » / « Reprendre un projet » (projets existants listés avec vignette).
+- [x] Atelier plein écran : photo au centre, survol = contour de la surface, clic = panneau de la surface
+  avec les finitions compatibles du catalogue en vignettes ; changement de finition sans resélection.
+- [x] Fenêtres reconnues (protégées) ; plinthes raccordées et prolongées le long de leur droite ; trous de
+  la couleur du mur rendus au mur ; contour d'une surface dessiné sous les objets.
+- [x] Nouvelle matière au sol : le dessin de l'ancien revêtement (chevrons) n'apparaît plus sous le béton ciré.
+- [x] Parquet : sens des lames (rotation) et échelle ; perspective 4 coins.
+- [x] Objets glissés depuis le catalogue, rotation, taille, duplication, suppression ; import d'un visuel
+  (PNG transparent tel quel, sinon détourage) lié à sa référence.
+- [x] « Ma sélection » : dernière finition par surface, quantités d'objets, m² × couches ÷ rendement,
+  « À renseigner » et total partiel ; tarif public / pro.
+- [x] Base : migration 5 (prix, unité, m² par unité, couches sur les finitions), additive ; impact mesuré
+  sur une copie de la vraie base : 4 colonnes ajoutées, aucune ligne modifiée, intégrité ok.
+- [x] Mode « Présenter au client » (rideau avant / après) et PDF (2 pages) généré localement.
+- [x] Visuel haute définition 4 fois plus rapide (flous larges calculés sur image réduite) : ≈ 11 s au lieu de 44 s.
+- Vérifié dans le navigateur sur une vraie photo (chambre-salon 2400 × 1800, données de test) : mur gauche
+  Sauge puis Terracotta sans toucher prises ni plinthes, parquet puis béton ciré puis parquet tourné de 90°,
+  fauteuil glissé, dupliqué (quantité 2, 938 €) puis supprimé (quantité 1), 24 m² et 18 m² saisis,
+  rechargement de la page et réouverture du projet identiques, présentation, PDF relu : Terracotta
+  « À renseigner », parquet 9 paquets 584,10 €, fauteuil 1 × 469 €, total partiel 1 053,10 €.
+  53 tests Python, 45 tests d'écrans.
+- Limites : la photo d'essai n'a pas de canapé (préservation des meubles vérifiée sur le rendu de référence
+  et la pièce d'angle) ; corniche et coffre de volet non reconnus (pinceau « Ajouter ») ; une plinthe sous
+  un habillage (placards) n'est plus détectée quand le mur au-dessus n'est pas un mur.
+
 ## Tâches
 - [x] Vérification automatique installée (.claude/hooks/verifier.ps1 + .claude/settings.json)
 - [x] Base : migrations sans perte (teintes/matières, photos d'article, projets, variantes) + tests

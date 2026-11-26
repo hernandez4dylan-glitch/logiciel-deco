@@ -43,6 +43,7 @@ export async function finishPayload(zones: Zone[], mask: (z: Zone) => HTMLCanvas
       lumiere: z.lumiere,
       finition: zoneAspect(z),
       surface: z.surface,
+      rotation: z.rotation,
     });
   }
   return out;

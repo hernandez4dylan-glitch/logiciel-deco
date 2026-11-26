@@ -176,6 +176,19 @@ def _nettoyer(m, min_frac=0.002):
     return m * garde[lab]
 
 
+def _principal(m, frac=0.25):
+    """Plafond et sol forment une grande zone d'un seul tenant : un îlot « plafond » au
+    milieu d'un mur est une erreur du modèle ; il est retiré (le mur le récupère)."""
+    b = (m > 0.5).astype(np.uint8)
+    n, lc, st, _ = cv2.connectedComponentsWithStats(b, connectivity=8)
+    if n <= 2:
+        return m
+    grand = int(st[1:, 4].max())
+    garde = st[:, 4] >= frac * grand
+    garde[0] = False
+    return m * garde[lc]
+
+
 def _recaler_mur(img, brut, proba):
     """Le modèle hésite parfois entre mur et porte dans un couloir vu par une porte
     ouverte. On repart des zones où il est sûr (cœur du mur) et on fait croître la
@@ -255,7 +268,7 @@ def _plan(pan, prof, coeur, voisins=None, suspect=None):
     return pan * ~hors
 
 
-def _plinthes(img, sol, interdit):
+def _plinthes(img, sol, interdit, mur=None):
     """Plinthes : bande basse posée sur le sol, sous un mur ou un habillage, délimitée en
     haut par une arête nette (changement de couleur). Recherche colonne par colonne
     juste au-dessus du bord du sol ; hauteur entre 0,5 % et 5 % de l'image ; on garde
@@ -275,6 +288,9 @@ def _plinthes(img, sol, interdit):
         col = lab[y0 - hmax - 3:y0, x]
         # arête la plus forte dans la bande (différence entre 3 px au-dessus et au-dessous)
         d = np.linalg.norm(col[6:] - col[:-6], axis=1)
+        # On ignore le bas de la bande (joint d'ombre entre plinthe et sol) : on cherche
+        # le haut de la plinthe, au contact du mur.
+        d = d[: max(1, len(d) - hmin)]
         if not len(d):
             continue
         k = int(np.argmax(d))
@@ -283,13 +299,16 @@ def _plinthes(img, sol, interdit):
         h = (len(col) - (k + 3))
         if hmin <= h <= hmax:
             # la plinthe elle-même est d'une couleur à peu près uniforme
-            bande = lab[y0 - h + 1:y0 - 1, x]
+            # uniformité vérifiée sur le haut de la bande (le bas touche le joint d'ombre)
+            bande = lab[y0 - h + 1:y0 - h + 1 + max(2, int(h * 0.65)), x]
             if len(bande) >= 2 and float(np.std(bande[:, 0])) < 14:
                 hauteur[x] = h
     # lissage le long du mur et tronçons continus
+    dessus = max(3, int(0.01 * H))
     hl = cv2.medianBlur(hauteur.astype(np.uint8).reshape(1, -1) if hmax < 255 else hauteur.reshape(1, -1).astype(np.uint8), 9).ravel().astype(np.int32)
     ok = hl > 0
     plinthe = np.zeros((H, W), bool)
+    troncons = []  # (début, fin) des tronçons retenus
     debut = None
     for x in range(W + 1):
         if x < W and ok[x]:
@@ -300,14 +319,85 @@ def _plinthes(img, sol, interdit):
             haut = haut_sol[xs] - hl[xs]
             a, b0 = np.polyfit(xs, haut, 1)
             # Une plinthe est droite : le pied arrondi d'un fauteuil ou d'un pouf ne l'est pas.
-            if float(np.std(haut - (a * xs + b0))) > 0.004 * H:
+            if float(np.std(haut - (a * xs + b0))) > 0.008 * H:
                 debut = None
                 continue
-            for xx in range(debut, x):
+            # Haut de plinthe = une droite (calée sur les colonnes où il est le plus haut :
+            # un reflet ou une ombre ne fait que l'abaisser localement).
+            res = haut - (a * xs + b0)
+            ligne = a * xs + b0 + min(0.0, float(np.percentile(res, 20)))
+            # Au-dessus d'une plinthe, il y a le mur (pas l'assise d'un fauteuil posé au sol).
+            if mur is not None and np.mean([mur[max(0, int(yh) - dessus), xx] for xx, yh in zip(xs, ligne)]) < 0.6:
+                debut = None
+                continue
+            for xx, yh in zip(xs, ligne):
                 y0 = haut_sol[xx]
-                plinthe[max(0, y0 - hl[xx]):y0, xx] = True
+                plinthe[max(0, int(round(yh))):y0, xx] = True
+            troncons.append((debut, x, int(round(ligne[0])), int(round(ligne[-1]))))
         debut = None
+    _ponts_plinthe(lab, plinthe, troncons, haut_sol, hl, interdit, W, mur=mur, dessus=dessus)
     return cv2.GaussianBlur(plinthe.astype(np.float32), (0, 0), 0.8)
+
+
+def _ponts_plinthe(lab, plinthe, troncons, haut_sol, hl, interdit, W, ecart=12.0, mur=None, dessus=3):
+    """Relie deux tronçons de plinthe séparés par un court trou (reflet, prise, ombre qui
+    a brouillé l'arête) et prolonge chaque tronçon le long de sa droite (jusqu'à l'angle,
+    au bord de la photo, à un meuble), tant que la couleur reste celle de la plinthe à cet
+    endroit. Sans cela, ces morceaux prendraient la teinte du mur."""
+    if not troncons:
+        return
+
+    def couleur(x0, x1):
+        """Couleur de la plinthe déjà trouvée entre les colonnes x0 et x1."""
+        x0, x1 = max(0, x0), min(W, x1)
+        bloc = plinthe[:, x0:x1]
+        return np.median(lab[:, x0:x1][bloc], axis=0) if bloc.any() else None
+
+    def proche(x, h0, y0, ref):
+        if ref is None or not 2 <= y0 - h0 or interdit[max(0, y0 - 2), x]:
+            return False
+        if mur is not None and not mur[max(0, h0 - dessus):max(1, h0), x].any():
+            return False
+        m = np.median(lab[max(0, h0):y0, x], axis=0) - ref
+        # la lumière varie le long d'un mur : on tolère l'écart de clarté, pas de teinte
+        return float(np.sqrt((0.35 * m[0]) ** 2 + m[1] ** 2 + m[2] ** 2)) < ecart
+
+    bord = max(8, int(0.02 * W))
+    for (d1, f1, _, ta), (d2, f2, tb, _) in zip(troncons, troncons[1:]):
+        if d2 - f1 <= 0 or d2 - f1 > 0.15 * W:
+            continue
+        ya, yb = haut_sol[f1 - 1], haut_sol[d2]
+        if ya < 0 or yb < 0:
+            continue
+        ra, rb = couleur(f1 - bord, f1), couleur(d2, d2 + bord)
+        xs = np.arange(f1, d2)
+        t = np.linspace(0, 1, len(xs) + 2)[1:-1]
+        haut = np.round(ta + (tb - ta) * t).astype(int)
+        bas = np.round(ya + (yb - ya) * t).astype(int)
+        bons = sum(1 for x, h0, b0 in zip(xs, haut, bas) if proche(x, h0, b0, ra) or proche(x, h0, b0, rb))
+        if bons < 0.7 * len(xs):
+            continue
+        for x, h0, b0 in zip(xs, haut, bas):
+            plinthe[max(0, h0):max(0, b0), x] = True
+    for d, f, ta, tb in troncons:
+        if f - d < 0.06 * W and mur is None:
+            continue  # sans le mur pour juger, un court morceau (pied de meuble…) ne se prolonge pas
+        pente = (tb - ta) / max(1, f - 1 - d)
+        epaisseur = max(2, int(np.median(haut_sol[d:f] - (ta + pente * (np.arange(d, f) - d)))))
+        for pas, x0 in ((-1, d - 1), (1, f)):
+            ref = couleur(d, d + bord) if pas < 0 else couleur(f - bord, f)
+            manque, x = 0, x0
+            while 0 <= x < W and manque <= 8 and abs(x - x0) < 0.3 * W:
+                y0 = haut_sol[x]
+                if y0 < 0 or plinthe[max(0, y0 - 1), x]:
+                    break
+                h0 = int(round(ta + pente * (x - d)))
+                if y0 - h0 <= 2 * epaisseur and proche(x, h0, y0, ref):
+                    plinthe[max(0, h0):y0, x] = True
+                    manque = 0
+                else:
+                    manque += 1
+                x += pas
 
 
 def _portes(img, portes, ep_rel=0.045):
@@ -427,6 +517,32 @@ def _par_couleur(img, pan, ecart=12.0, min_part=0.12):
     return out
 
 
+def _trous_meme_couleur(img, pan, ecart=12.0):
+    """Trous entièrement entourés par un pan de mur et de la couleur du mur (le modèle y
+    a vu un objet qui n'existe pas) : rendus au mur. Une prise, un interrupteur, un
+    tableau, d'une autre couleur, restent exclus."""
+    m = (pan > 0.5).astype(np.uint8)
+    if m.sum() < 2000:
+        return pan
+    H, W = m.shape
+    lab = cv2.cvtColor(cv2.GaussianBlur(img, (0, 0), 1.5), cv2.COLOR_BGR2LAB).astype(np.float32)
+    n, lc, st, _ = cv2.connectedComponentsWithStats(1 - m, connectivity=4)
+    out = pan.copy()
+    k = np.ones((9, 9), np.uint8)
+    for i in range(1, n):
+        x, y, w, h, aire = st[i]
+        if x == 0 or y == 0 or x + w >= W or y + h >= H or aire > 0.06 * m.sum():
+            continue  # touche le bord de l'image ou trop grand : pas un « trou »
+        t = (lc == i).astype(np.uint8)
+        anneau = (cv2.dilate(t, k) > 0) & (m > 0) & (t == 0)
+        if anneau.sum() < 10:
+            continue
+        if np.linalg.norm(np.median(lab[t > 0], axis=0) - np.median(lab[anneau], axis=0)) < ecart:
+            # trou rendu au mur, avec son liseré (bords adoucis du masque) : aucun trait ne reste
+            out = np.maximum(out, cv2.dilate(t, np.ones((5, 5), np.uint8)).astype(np.float32))
+    return out
+
+
 def analyser(img):
     """Analyse complète. Renvoie {'zones': [...], 'temps': {...}, 'elements': {...}}.
     Chaque zone : {'nom', 'surface', 'masque' (float H×W), 'profondeur' (0 = loin)}."""
@@ -452,7 +568,7 @@ def analyser(img):
     pg_full = np.stack([cv2.resize(c, (W, H), interpolation=cv2.INTER_LINEAR) for c in pg])
     lab = pg_full.argmax(0)
     masques = {}
-    for g in ('mur', 'plafond', 'sol', 'porte'):
+    for g in ('mur', 'plafond', 'sol', 'porte', 'fenetre'):
         brut = (lab == groupes.index(g)).astype(np.float32)
         if brut.mean() < (0.008 if g == 'porte' else 0.004):
             continue
@@ -462,13 +578,15 @@ def analyser(img):
         elif g == 'porte':
             brut = brut * (pg_full[groupes.index('porte')] > 0.6)
         masques[g] = _nettoyer(affiner(img, brut))
+        if g in ('plafond', 'sol'):
+            masques[g] = _principal(masques[g])
     t3 = time.perf_counter()
     zones = []
     if 'mur' in masques:
         coeur = pg_full[groupes.index('mur')] > 0.6
         if 'sol' in masques:
             interdit = (masques['porte'] > 0.5) if 'porte' in masques else np.zeros((H, W), bool)
-            masques['plinthe'] = _plinthes(img, masques['sol'], interdit)
+            masques['plinthe'] = _plinthes(img, masques['sol'], interdit, masques['mur'] > 0.5)
             masques['mur'] = masques['mur'] * (1 - masques['plinthe'])
         voisins = np.zeros((H, W), bool)
         for g in ('plafond', 'sol'):
@@ -482,6 +600,7 @@ def analyser(img):
                 masques['plafond'] = plaf
         pans = [m for m in pans if (m > 0.5).sum() > 0.003 * H * W]
         pans = [q for m in pans for q in _par_couleur(img, m)]
+        pans = [_trous_meme_couleur(img, m) for m in pans]
         infos = []
         for m in pans:
             sel = m > 0.5
@@ -510,6 +629,16 @@ def analyser(img):
             zones.append({'nom': nom, 'surface': g, 'masque': masques[g], 'profondeur': pm(masques[g])})
     if 'plinthe' in masques and (masques['plinthe'] > 0.5).mean() >= 0.001:
         zones.append({'nom': 'Plinthes', 'surface': 'plinthe', 'masque': masques['plinthe'], 'profondeur': pm(masques['plinthe'])})
+    if 'fenetre' in masques:
+        # Fenêtres : reconnues pour être protégées (vitrage, rideaux) ; une par ouverture.
+        b = (masques['fenetre'] > 0.5).astype(np.uint8)
+        n, lc, st, _ = cv2.connectedComponentsWithStats(b, connectivity=8)
+        k = 0
+        for i in sorted(range(1, n), key=lambda i: st[i, 0]):
+            if st[i, 4] >= 0.004 * H * W:
+                k += 1
+                m = masques['fenetre'] * (lc == i)
+                zones.append({'nom': f'Fenêtre {k}', 'surface': 'fenetre', 'masque': m, 'profondeur': pm(m)})
     if 'porte' in masques:
         for k, (feuille, cadre) in enumerate(_portes(img, masques['porte']), 1):
             zones.append({'nom': f'Porte {k}', 'surface': 'porte', 'masque': feuille, 'profondeur': pm(feuille)})

@@ -179,7 +179,8 @@ def render(p):
                           'texture':decode(z['texture'])[:,:,:3] if z.get('texture') else None,
                           'quad':quad,'repetitions':float(z.get('repetitions') or 4),
                           'intensite_lumiere':float(np.clip(float(z.get('lumiere') or 1),0,2)),
-                          'finition':finition,'surface':surface})
+                          'finition':finition,'surface':surface,
+                          'rotation':float(np.clip(float(z.get('rotation') or 0),-360,360))})
         result=appliquer(rgb,zones)
     else: raise ValueError('Retouche inconnue')
     ok,encoded=cv2.imencode('.png',result)

@@ -9,7 +9,7 @@ INSERT_FIELDS = {
     'suppliers': {'name','contact_name','email','phone','lead_time_days'},
     'expenses': {'label','category','amount','expense_date'},
     'decorators': {'name','company','email','phone','discount_percent'},
-    'finishes': {'kind','name','reference','color','texture_path','motif_cm','finition','marque','gamme','usage'},
+    'finishes': {'kind','name','reference','color','texture_path','motif_cm','finition','marque','gamme','usage','prix_ttc','unite','m2_par_unite','couches'},
     'product_photos': {'product_id','image_path','cutout_path','label'},
     'projects': {'name','client','notes'},
     'variants': {'project_id','name','base_path','width','height','data'},
@@ -20,7 +20,7 @@ UPDATE_FIELDS = {
     'suppliers': {'name','contact_name','email','phone','lead_time_days'},
     'decorators': {'name','company','email','phone','discount_percent'},
     'sales': {'customer_name'},
-    'finishes': {'name','reference','color','texture_path','motif_cm','finition','marque','gamme','usage'},
+    'finishes': {'name','reference','color','texture_path','motif_cm','finition','marque','gamme','usage','prix_ttc','unite','m2_par_unite','couches'},
     'product_photos': {'cutout_path','label'},
     'projects': {'name','client','notes'},
     'variants': {'name','data','base_path','width','height'},
@@ -29,11 +29,11 @@ DELETABLE = {'products','expenses','sales','suppliers','decorators','finishes','
 # Filtres d'égalité autorisés dans les lectures (colonne → tables).
 FILTRES = {'project_id': {'variants'}, 'product_id': {'product_photos'}, 'kind': {'finishes'}}
 BOOLEANS = ('is_pro','published_web')
-NUMBERS = ('purchase_price_ht','sale_price_ttc','pro_price_ttc','amount','stock','low_stock_threshold','lead_time_days','motif_cm','width','height')
-FACULTATIFS = {'motif_cm'}  # nombres qui peuvent rester vides
+NUMBERS = ('purchase_price_ht','sale_price_ttc','pro_price_ttc','amount','stock','low_stock_threshold','lead_time_days','motif_cm','width','height','prix_ttc','m2_par_unite','couches')
+FACULTATIFS = {'motif_cm','prix_ttc','m2_par_unite','couches'}  # nombres qui peuvent rester vides
 FINITIONS = {'peinture','papier','enduit'}
 ASPECTS = {'mat','velours','satin','brillant'}  # finition d'une peinture
-USAGES = {'mur','plafond','porte','cadre','plinthe','sol','autre'}
+USAGES = {'mur','plafond','porte','cadre','plinthe','fenetre','sol','autre'}
 TOUCH = {'projects','variants','finishes'}  # tables avec updated_at
 
 # Migrations additives : jamais de suppression ni de réécriture des données existantes.
@@ -99,6 +99,14 @@ ALTER TABLE finishes ADD COLUMN usage TEXT;
 INSERT INTO finishes (kind, name, reference, color, texture_path, motif_cm, finition, usage) VALUES
   ('papier', 'Parquet chêne clair (exemple)', 'EX-SOL-CHENE', NULL, '/images/motifs/parquet-chene.jpg', 140, 'satin', 'sol');
 """,
+    # Liste d'achat : prix, conditionnement (unité vendue et m² couverts par unité et par
+    # couche) et nombre de couches. Colonnes ajoutées, lignes existantes intactes.
+    5: """
+ALTER TABLE finishes ADD COLUMN prix_ttc NUMERIC;
+ALTER TABLE finishes ADD COLUMN unite TEXT;
+ALTER TABLE finishes ADD COLUMN m2_par_unite NUMERIC;
+ALTER TABLE finishes ADD COLUMN couches INTEGER;
+""",
 }
 VERSION = max(MIGRATIONS)
 
@@ -131,6 +139,9 @@ def check(values):
     if values.get('kind') == 'peinture' and values.get('finition') not in (None, '') and values['finition'] not in ASPECTS:
         raise ValueError('Finition de peinture inconnue (mat, velours, satin, brillant)')
     if values.get('usage') not in (None, '') and values['usage'] not in USAGES: raise ValueError('Usage inconnu')
+    if values.get('couches') is not None and not 1 <= float(values['couches']) <= 6: raise ValueError('Nombre de couches entre 1 et 6')
+    if values.get('m2_par_unite') is not None and not float(values['m2_par_unite']) > 0: raise ValueError('Surface couverte par unité invalide')
+    if values.get('unite') is not None and len(str(values['unite'])) > 40: raise ValueError('Unité trop longue')
     for field in ('marque', 'gamme', 'reference', 'name'):
         if values.get(field) is not None and len(str(values[field])) > 120: raise ValueError('Texte trop long')
     if values.get('color') is not None and not re.fullmatch('#[0-9a-fA-F]{6}',str(values['color'])): raise ValueError('Couleur invalide')

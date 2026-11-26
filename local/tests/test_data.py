@@ -94,6 +94,7 @@ class DataTests(unittest.TestCase):
         noms = {r[0] for r in old.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         self.assertTrue({'finishes', 'product_photos', 'projects', 'variants'} <= noms)
         self.assertEqual(old.execute('SELECT count(*) FROM finishes').fetchone()[0], 8)
+        self.assertTrue({'prix_ttc', 'unite', 'm2_par_unite', 'couches'} <= {r[1] for r in old.execute('PRAGMA table_info(finishes)')})
         self.assertEqual(old.execute("SELECT count(*) FROM finishes WHERE kind='papier'").fetchone()[0], 2)
         self.assertEqual(old.execute("SELECT count(*) FROM finishes WHERE usage='sol'").fetchone()[0], 1)
         cols = {r[1] for r in old.execute('PRAGMA table_info(finishes)')}

@@ -55,94 +55,51 @@ fond : un trait large sur un pied fin suffit). Vérifiez sur fond clair puis sur
 fond sombre, puis « Enregistrer le détourage » : il est rangé sur la fiche
 article et réutilisé dans tous les projets.
 
-Studio Plan & 3D (rendez-vous client)
-Ouvrez « Espace Pro Décorateurs », puis « Studio Plan & 3D ».
-1. « Nouveau projet » : nom, client, et le rendu 3D de l’architecte ou la photo
-   de la pièce. Le format est conservé (panoramique, vertical) ; l’image est
-   seulement réduite à 2400 pixels sur le grand côté. Sans image, une pièce
-   vierge est générée.
-   Dès l'ouverture, l'IA locale reconnaît la pièce (une seule fois, 10 à 20 s) et
-   la découpe en surfaces : chaque pan de mur (séparé aussi quand deux revêtements
-   de teintes différentes se côtoient, par exemple un habillage bleu-gris et un mur
-   beige), le plafond, le sol, les plinthes, chaque porte et son cadre (quand le
-   cadre a sa propre couleur). Fenêtres, tableaux et meubles sont laissés de côté.
-   En survolant la photo avec une teinte choisie, la surface visée s'affiche dans
-   cette teinte et son nom apparaît (« Cliquez pour peindre « Plinthes » ») :
-   zoomez à la molette pour viser une plinthe ou un cadre fin.
-   PEINDRE : onglet « Murs », 1. cliquez sur une teinte (ou une chaux, un papier
-   peint, un sol), 2. cliquez sur la photo : le mur, le plafond, le sol ou la
-   porte visé prend la teinte, lumière conservée. Chaque clic peint une surface ;
-   changez de teinte et cliquez ailleurs. « Tous les murs d'un coup » existe aussi.
-   « Prendre une couleur sur la photo » : la couleur prélevée devient le pinceau.
-   Si une surface n'a pas été reconnue, le clic la sélectionne à la baguette.
-   La surface peinte se règle ensuite (mat, velours, satiné, brillant, lumière,
-   taille du motif). La sélection à la main reste repliée en bas du panneau.
-2. Onglet « Murs » : « + Mur », « + Plafond », « + Porte », « + Sol » ou
-   « + Autre » crée une surface de ce type, puis la baguette : un clic la
-   sélectionne jusqu’aux arêtes, cadres et plinthes (cliquez plusieurs fois si
-   la lumière varie beaucoup ; l’intérieur des lettres collées est repris). « Ajouter » et « Protéger » corrigent au pinceau
-   (fenêtre, plinthe, meuble devant le mur) ; « Affiner les bords » recale le
-   contour sur la photo. Un clic sur une teinte de la bibliothèque l’applique :
-   la lumière de la pièce est conservée (côté fenêtre plus clair). Pour un papier
-   peint, réglez la taille du motif et « Aligner sur la perspective » (glissez
-   les 4 coins sur les angles du mur). Un enduit utilise la photo d’échantillon.
-   Porte : sélectionnez la porte avec son huisserie, réglez la largeur du cadre
-   puis « Séparer le cadre » : le cadre devient une surface à part (cadre blanc
-   satiné, porte colorée…). Sol : choisissez un motif de l’onglet « Papiers &
-   sols » (parquet…) puis alignez les 4 coins sur la perspective du sol.
-   Finition : Mat, Velours, Satiné ou Brillant, en un clic sous la surface.
-   Par défaut, celle de la fiche de la teinte, sinon celle de la surface (mur et
-   plafond mat, porte et cadre satiné). Le mat absorbe la lumière ; velours,
-   satiné puis brillant reflètent de plus en plus le sol, les meubles et la
-   lumière (plus nettement sur une porte que sur un grand mur).
-   « Ajouter » dans la bibliothèque enregistre une teinte ou une matière comme un
-   produit : marque (fournisseur), gamme, nom, référence, couleur, finition et
-   usage conseillé (mur, porte, sol…), ou son motif / sa photo d’échantillon.
-   « Importer » charge un nuancier fournisseur depuis Excel : téléchargez le
-   modèle, une ligne par teinte, enregistrez au format CSV et choisissez-le ;
-   un aperçu montre les teintes nouvelles, mises à jour (même marque et même
-   référence : pas de doublon) et les lignes refusées avant d’importer.
-   La recherche et le filtre « marque » retrouvent une teinte dans la bibliothèque.
-   La « Pipette » prélève une couleur sur la photo (coussin, tissu, échantillon)
-   et l’applique au mur ; « Enregistrer cette teinte » lui donne une référence.
-3. Onglet « Articles » : cliquez un article du catalogue, puis cliquez sur la
-   photo à l'endroit où poser sa base (sol, plateau d'une console). Glissez-le
-   ensuite par sa base si besoin (le point rond = les pieds), réglez la taille avec la poignée carrée ou le
-   curseur. « Poser sur un support » puis un clic sur le sol ou le plateau d’une
-   console y pose exactement la base de l’article. Ombre de contact réglable
-   (intensité, douceur, étendue), miroir, inclinaison, angle de vue si l’article
-   a plusieurs photos. « Accorder à la pièce » adapte la luminosité et la teinte
-   de l’article à l’endroit où il est posé (réglables ensuite à la main).
-   « Ombre portée » : une lumière pour toute la pièce (longueur, direction, vers
-   le fond ou vers l’avant), que tous les articles suivent.
-   « Premier plan existant » : sélectionnez à la baguette ou
-   au pinceau un meuble de la photo ; les articles « Passe derrière le premier
-   plan » sont alors masqués par lui.
-4. Onglet « Photo » : gomme (un objet à la fois, sur un fond simple) et
-   remplacement du décor. « Annuler la dernière retouche » revient d’une étape
-   (photo, surfaces et premier plan) ; « Revenir à l’image importée » les annule toutes.
-   « Exporter pour l'IA » (au-dessus de l'image) : téléchargez le visuel en PNG
-   et copiez la consigne prête à l'emploi (rendu 3D photoréaliste, perspective,
-   finitions et articles conservés, finitions utilisées ajoutées). Joignez le
-   visuel dans votre IA d'images et collez la consigne. La consigne se modifie
-   dans la même fenêtre et reste mémorisée sur le PC. « Ou optimiser sur ce PC »
-   lance la retouche locale (contours et ombres des articles, 15 à 60 s).
-   Modèles, licences et restrictions d'usage : local\modeles\LISEZ-MOI-MODELES.txt.
-5. Variantes : « Dupliquer la variante » puis changez une seule chose (par
-   exemple la teinte du mur, en un clic) ; les articles restent à leur place.
-   « Comparer » affiche deux variantes en rideau ou côte à côte avec leurs listes.
-6. Remise au client : « Visuel PNG » (pleine résolution), « Fiche client (PDF) »
-   (visuel, références, quantités, finitions ; choisissez « Enregistrer au format
-   PDF » dans la fenêtre d’impression), « Références (CSV) » pour Excel.
-   Le tarif Public ou Pro se choisit dans la liste chiffrée.
-Ctrl+Z / Ctrl+Y (ou les boutons Annuler / Rétablir au-dessus de l’image)
-reviennent sur les déplacements, réglages et finitions.
-Tout est enregistré automatiquement (« Enregistré » en haut à droite) : fermez
-le logiciel et rouvrez le projet dans la liste pour reprendre.
-Limites : l’ombre portée est une projection réglée à la main (pas un calcul
-depuis les fenêtres) ; l’accord de lumière ajuste luminosité et teinte, sans
-recréer les reflets ; le rééclairage complet d’un rendu génératif n’est pas réalisé. Chaque calcul
-(baguette, finitions) prend de 1 à 5 secondes sur un PC de bureau.
+Espace décorateur (rendez-vous client)
+Ouvrez « Espace Pro Décorateurs » : l'onglet « Espace décorateur » s'ouvre.
+1. Accueil : « Importer une photo » (cliquez ou déposez la photo du salon du
+   client, ou le rendu de l'architecte) ou « Reprendre un projet » (vignettes de
+   vos projets enregistrés). L'atelier s'ouvre en plein écran autour de la photo ;
+   nom du projet, client et propositions (« Dupliquer » pour essayer une autre
+   ambiance sans perdre la première) se règlent en haut.
+2. Reconnaissance automatique (IA locale, 20 à 40 s à l'import) : chaque pan de
+   mur (deux murs d'un angle sont séparés, comme deux teintes voisines), le
+   plafond, le sol, les plinthes, chaque porte et son cadre, chaque fenêtre.
+   Prises, tableaux, meubles et fenêtres restent intacts. Survolez la photo : la
+   surface visée est cernée. Cliquez dessus pour l'habiller.
+3. Habiller une surface : le panneau montre les finitions du catalogue qui lui
+   conviennent (peintures, chaux, papiers peints, sols). Un clic sur une vignette
+   l'essaie ; cliquez-en une autre pour comparer (bleu → beige, parquet → béton
+   ciré), sans resélectionner la surface. La lumière, les ombres et les reflets de
+   la photo sont conservés. Réglages selon la matière : aspect (mat, velours,
+   satiné, brillant), échelle du motif, sens des lames (curseur et « 90° »),
+   « Ajuster la perspective (4 coins) », lumière de la pièce.
+   Contour à corriger ? « Ajouter » ou « Retirer » au pinceau (zoom à la molette),
+   « Coller aux bords », « Annuler le trait » : la correction est enregistrée.
+   « Relancer la reconnaissance » garde les finitions déjà posées.
+   Saisissez la surface réelle (m²) pour chiffrer la quantité.
+4. Objets : onglet « Objets », glissez un article du catalogue sur la photo (ou
+   cliquez-le puis cliquez sur la photo). Poignée carrée = taille, rond au-dessus
+   = rotation, boutons pour dupliquer, supprimer, miroir. « Passe derrière le
+   premier plan » cache l'objet derrière un meuble de la photo sélectionné à la
+   baguette. « Importer mon visuel » : un PNG transparent est utilisé tel quel,
+   une photo avec fond est détourée automatiquement ; il reste lié à la référence.
+5. « Ma sélection » (en haut) : ce qui est visible dans la pièce. Une surface ne
+   compte que sa dernière finition ; deux fauteuils identiques = quantité 2.
+   Quantité d'un revêtement = m² × couches ÷ rendement (arrondi au conditionnement
+   supérieur), par exemple 18 m² de parquet en paquets de 2,2 m² = 9 paquets.
+   Prix, unité, rendement et couches se renseignent sur la fiche de la finition ;
+   ce qui manque est marqué « À renseigner » et le total est dit partiel.
+6. « Présenter au client » : grand visuel en haute définition, rideau avant /
+   après, liste à la demande, aucun outil. « Télécharger le PDF » : nom du
+   projet, photo d'origine, visuel final, références, quantités, prix unitaires
+   et total, identiques à l'écran.
+Annuler / Rétablir (ou Ctrl+Z / Ctrl+Y) sont toujours en haut à gauche.
+Le menu « … » garde l'export pour une IA d'images, l'optimisation sur ce PC et
+la retouche de la photo (gomme, décor).
+Tout est enregistré automatiquement (« Enregistré » en haut à droite).
+Limites : une surface que l'IA n'a pas trouvée (corniche, coffre de volet) se
+complète au pinceau « Ajouter » ; l'ombre portée des objets se règle à la main.
 Dans « Catalogue & Stock », « Retouche showroom » prépare une photo d’annonce :
 détourage, correction automatique de la lumière, fond uni ou décor clair avec
 ombre au sol. Le tableau de bord suit les ventes enregistrées chaque semaine
@@ -163,7 +120,7 @@ régénèrent les images de Essai_photo. Le moteur photo est dans local\photo.py
 (point d’entrée), local\detourage.py (détourage), local\finitions.py (murs),
 local\gomme.py (effacement) et local\retouche.py (décor).
 essais_finitions.py régénère les démos des surfaces et finitions (mat, velours,
-satiné, brillant). Le studio est dans
+satiné, brillant). L'espace décorateur est dans src\components\decor,
 src\components\studio et src\lib (scene.ts, render-scene.ts, compose.ts).
 Pour essayer le serveur sur des données de test, définissez ATELIER_DATA vers
 un dossier vide avant de lancer runtime\windows\python.exe local\server.py.

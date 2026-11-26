@@ -45,8 +45,8 @@ describe("historique des retouches de la photo", () => {
       ...newScene(),
       foreground: "pp-1.png",
       zones: [
-        { id: "z1", name: "Mur", mask: "m.png", finish: null, quad: null, repetitions: 4, lumiere: 1, visible: true, surface: "mur", aspect: null, auto: false },
-        { id: "z2", name: "Plafond", mask: "p.png", finish: null, quad: null, repetitions: 4, lumiere: 1, visible: false, surface: "mur", aspect: null, auto: false },
+        { id: "z1", name: "Mur", mask: "m.png", finish: null, quad: null, repetitions: 4, lumiere: 1, visible: true, surface: "mur", aspect: null, auto: false, m2: null, rotation: 0 },
+        { id: "z2", name: "Plafond", mask: "p.png", finish: null, quad: null, repetitions: 4, lumiere: 1, visible: false, surface: "mur", aspect: null, auto: false, m2: null, rotation: 0 },
       ],
     };
     s = pushHistory(s, "base-1.jpg");

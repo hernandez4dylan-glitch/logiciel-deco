@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Brush, Image as ImageIcon, Loader2, Package, Paintbrush2, Redo2, Sparkles, Undo2 } from "lucide-react";
+import { Columns2, Image as ImageIcon, Loader2, MoreHorizontal, Package, Paintbrush2, Presentation as IconePresentation, Redo2, ShoppingBag, Sparkles, Undo2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ListeSurfaces, PanneauSurface } from "@/components/decor/panneau-surface";
+import { MaSelectionSheet } from "@/components/decor/ma-selection";
+import { Presentation } from "@/components/decor/presentation";
+import { maSelection } from "@/lib/selection";
+import { localStorageGet, localStorageSet } from "@/components/studio/panel-references";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Stage, BRUSH_TOOLS, type StageHandle, type StageTool } from "@/components/studio/stage";
@@ -56,6 +62,12 @@ export type WorkspaceApi = {
   /** Teinte « au pinceau » : un clic sur la photo la pose sur la surface visée. */
   pinceau: Finish | null;
   choisirPinceau: (f: Finish | null) => void;
+  /** Surface survolée (contour sur la photo) et surface ouverte dans le panneau. */
+  setSurvol: (id: string | null) => void;
+  choisirSurface: (id: string | null) => void;
+  nouvelleSurface: () => void;
+  /** Article posé depuis une photo précise (visuel importé). */
+  addItemPhoto: (productId: string, photoId: string) => void;
   analyse: AnalyseInfo | null;
   analysing: boolean;
   reanalyse: () => void;
@@ -95,6 +107,7 @@ export function Workspace({
   discount,
   onSaveState,
   flushRef,
+  projet,
 }: {
   variant: Variant;
   products: ProductRow[];
@@ -103,6 +116,7 @@ export function Workspace({
   discount: number;
   onSaveState: (s: SaveState) => void;
   flushRef: React.MutableRefObject<(() => Promise<void>) | null>;
+  projet?: { nom: string; client: string | null };
 }) {
   const qc = useQueryClient();
   const stage = useRef<StageHandle>(null);
@@ -138,6 +152,10 @@ export function Workspace({
   const [pinceau, setPinceau] = useState<Finish | null>(null);
   /** Surface sous la souris quand une teinte est choisie (aperçu avant le clic). */
   const [survol, setSurvol] = useState<string | null>(null);
+  const [avantPart, setAvantPart] = useState<number | null>(null);
+  const [selOuverte, setSelOuverte] = useState(false);
+  const [presente, setPresente] = useState<{ avant: string | null; apres: string | null } | null>(null);
+  const [tarifPro, setTarifPro] = useState(() => localStorageGet("studio-tarif") === "pro");
   const dirty = useRef(false);
   const saving = useRef(false);
   const again = useRef(false);
@@ -437,6 +455,13 @@ export function Workspace({
   }
 
   async function onClickImage(p: Point) {
+    if (tool === "deplacer") {
+      // Clic hors des articles : la surface sous le pointeur s'ouvre dans le panneau.
+      const z = p[0] >= 0 && p[1] >= 0 && p[0] < W && p[1] < H ? surfaceSous(p) : null;
+      setActiveZoneId(z?.id ?? null);
+      if (z) setPanel("murs");
+      return;
+    }
     if (tool === "peindre" && pinceau) {
       const zone = surfaceSous(p);
       if (zone) {
@@ -453,7 +478,7 @@ export function Workspace({
         masks.current.set(id, newCanvas(W, H));
         await selectionAuPoint(p, id);
         const n = sceneRef.current.zones.filter((z) => z.surface === surface).length + 1;
-        const zone: Zone = { id, name: `${surfaceLabel(surface).split(" ")[0]} ${n}`, mask: null, finish: null, quad: null, repetitions: 4, lumiere: 1, visible: true, surface, aspect: null, auto: false };
+        const zone: Zone = { id, name: `${surfaceLabel(surface).split(" ")[0]} ${n}`, mask: null, finish: null, quad: null, repetitions: 4, lumiere: 1, visible: true, surface, aspect: null, auto: false, m2: null, rotation: 0 };
         setScene((s) => ({ ...s, zones: [...s.zones, { ...zone, ...patchFinition(zone, pinceau) }] }));
         setActiveZoneId(id);
       } catch (e) {
@@ -505,12 +530,18 @@ export function Workspace({
       const hex = sampleColor({ data: d.data, width: W, height: H }, p[0], p[1], Math.max(2, Math.round(Math.max(W, H) / 600)));
       setTool("deplacer");
       if (!hex) return;
-      // La couleur prélevée devient le pinceau : un clic sur la photo la pose.
-      api.choisirPinceau({
+      const couleur: Finish = {
         id: "", kind: "peinture", name: `Couleur prélevée ${hex}`, reference: null, color: hex, texture_path: null, motif_cm: null,
         finition: null, marque: null, gamme: null, usage: null, created_at: "", updated_at: "",
-      });
-      toast.success(`Couleur ${hex} prise : cliquez sur la surface à peindre`);
+      };
+      const cible = sceneRef.current.zones.find((z) => z.id === activeZoneId);
+      if (cible) {
+        api.applyFinishTo(couleur, [cible.id]);
+        toast.success(`Couleur ${hex} posée sur « ${cible.name} » — « Enregistrer cette couleur » lui donne une référence`);
+      } else {
+        api.choisirPinceau(couleur);
+        toast.success(`Couleur ${hex} prise : cliquez sur la surface à peindre`);
+      }
     } else if (tool === "poser" && selectedUid) {
       // La base de l'article (pieds, socle) vient se poser exactement sur le point cliqué.
       updateItem(selectedUid, { x: p[0] / W, y: p[1] / H });
@@ -558,6 +589,40 @@ export function Workspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool, pinceau, survol, overlayKey, commitTick]);
   const zoneSurvolee = survol ? scene.zones.find((z) => z.id === survol) ?? null : null;
+  const contourCanvas = useRef<HTMLCanvasElement | null>(null);
+  const contour = useMemo(() => {
+    if (!(tool === "deplacer" || tool === "pipette") || !baseImg) return null;
+    // la surface ouverte n'est cernée que dans l'onglet Surfaces (pas par-dessus les objets)
+    const ids = [survol, panel === "murs" ? activeZoneId : null].filter((x, i, a): x is string => !!x && a.indexOf(x) === i);
+    if (!ids.length) return null;
+    const c = contourCanvas.current && contourCanvas.current.width === W ? contourCanvas.current : newCanvas(W, H);
+    contourCanvas.current = c;
+    const ctx = c.getContext("2d")!;
+    ctx.clearRect(0, 0, W, H);
+    const e = Math.max(2, Math.round(Math.max(W, H) / 450));
+    for (const id of ids) {
+      const m = masks.current.get(id);
+      if (!m) continue;
+      const tmp = newCanvas(W, H);
+      const t = tmp.getContext("2d")!;
+      // anneau = sélection décalée dans 8 directions, moins la sélection elle-même
+      for (const [dx, dy] of [[e, 0], [-e, 0], [0, e], [0, -e], [e, e], [-e, -e], [e, -e], [-e, e]]) t.drawImage(m, dx!, dy!);
+      t.globalCompositeOperation = "destination-out";
+      t.drawImage(m, 0, 0);
+      t.globalCompositeOperation = "source-in";
+      t.fillStyle = id === activeZoneId ? "#c0694a" : "#ffffff";
+      t.fillRect(0, 0, W, H);
+      if (id === survol && id !== activeZoneId) {
+        // voile léger sur la surface survolée
+        ctx.globalAlpha = 0.18;
+        ctx.drawImage(tinted(m, "#ffffff"), 0, 0);
+        ctx.globalAlpha = 1;
+      }
+      ctx.drawImage(tmp, 0, 0);
+    }
+    return c;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [survol, activeZoneId, panel, tool, commitTick, baseImg, W, H]);
 
   const activeZone = scene.zones.find((z) => z.id === activeZoneId) ?? null;
   const selected = scene.items.find((i) => i.uid === selectedUid) ?? null;
@@ -581,7 +646,6 @@ export function Workspace({
    *  changer de finition ensuite ne relance jamais l'analyse. */
   async function runAnalyse(force: boolean, img?: HTMLImageElement) {
     if (analysing) return;
-    if (force && sceneRef.current.zones.some((z) => z.finish) && !window.confirm("Relancer l'analyse remplace les surfaces actuelles et leurs finitions. Continuer ?")) return;
     const w = img?.naturalWidth ?? W, h = img?.naturalHeight ?? H;
     setAnalysing(true);
     if (force) debut.current = performance.now();
@@ -591,16 +655,23 @@ export function Workspace({
         mode: "analyse",
       });
       const nouvelles: Zone[] = [];
+      // Relancer garde l'habillage déjà choisi : une surface du même nom reprend sa finition.
+      const avant = new Map(sceneRef.current.zones.filter((z) => z.auto).map((z) => [`${z.surface}|${z.name}`, z]));
       for (const z of r.zones) {
         const id = crypto.randomUUID();
         masks.current.set(id, maskFromImage(await loadImage(z.masque), w, h, true));
         commits.current.set(id, 1);
         dirtyMasks.current.add(id);
-        nouvelles.push({ id, name: z.nom, mask: null, finish: null, quad: null, repetitions: 4, lumiere: 1, visible: true, surface: z.surface, aspect: null, auto: true });
+        const a = force ? avant.get(`${z.surface}|${z.nom}`) : undefined;
+        nouvelles.push({
+          id, name: z.nom, mask: null, finish: a?.finish ?? null, quad: a?.quad ?? null, repetitions: a?.repetitions ?? 4, lumiere: a?.lumiere ?? 1,
+          visible: true, surface: z.surface, aspect: a?.aspect ?? null, auto: true, m2: a?.m2 ?? null, rotation: a?.rotation ?? 0,
+        });
       }
       setScene((s) => ({
         ...s,
-        zones: force ? nouvelles : [...s.zones, ...nouvelles],
+        // les surfaces ajoutées à la main sont conservées
+        zones: force ? [...nouvelles, ...s.zones.filter((z) => !z.auto)] : [...s.zones, ...nouvelles],
         analyse: { temps: r.temps, apercu: null, date: new Date().toISOString() },
       }));
       setActiveZoneId(nouvelles[0]?.id ?? null);
@@ -636,7 +707,7 @@ export function Workspace({
       masks.current.set(id, newCanvas(W, H));
       setScene((s) => {
         const n = s.zones.filter((z) => z.surface === surface).length + 1;
-        const zone: Zone = { id, name: `${surfaceLabel(surface).split(" ")[0]} ${n}`, mask: null, finish: null, quad: null, repetitions: 4, lumiere: 1, visible: true, surface, aspect: null, auto: false };
+        const zone: Zone = { id, name: `${surfaceLabel(surface).split(" ")[0]} ${n}`, mask: null, finish: null, quad: null, repetitions: 4, lumiere: 1, visible: true, surface, aspect: null, auto: false, m2: null, rotation: 0 };
         return { ...s, zones: [...s.zones, zone] };
       });
       setActiveZoneId(id);
@@ -661,6 +732,23 @@ export function Workspace({
       setScene((s) => ({ ...s, zones: s.zones.map((z) => (ids.includes(z.id) ? { ...z, ...patchFinition(z, f) } : z)) }));
       // On quitte la sélection pour voir le rendu sans la surbrillance verte.
       if (tool === "mur-clic" || tool === "mur-plus" || tool === "mur-moins") setTool("deplacer");
+    },
+    setSurvol,
+    choisirSurface: (id) => {
+      setActiveZoneId(id);
+      setSelectedUid(null);
+      if (tool !== "deplacer" && tool !== "coins") setTool("deplacer");
+    },
+    nouvelleSurface: () => {
+      api.addZone("mur");
+      toast.info("Cliquez sur la surface à ajouter (mur, meuble à repeindre…) ; changez son type dans le panneau");
+    },
+    addItemPhoto: (productId, photoId) => {
+      const p = products.find((x) => x.id === productId);
+      if (!p) return;
+      api.addItem(p);
+      const uid = sceneRef.current.items.at(-1)?.uid;
+      if (uid) updateItem(uid, { photoId });
     },
     pinceau,
     choisirPinceau: (f) => {
@@ -701,7 +789,7 @@ export function Workspace({
           ...s,
           zones: [
             ...s.zones.map((z) => (z.id === zone.id ? { ...z, surface: "porte" as const } : z)),
-            { id, name: `Cadre de ${zone.name}`, mask: null, finish: null, quad: null, repetitions: 4, lumiere: zone.lumiere, visible: true, surface: "cadre", aspect: null, auto: false },
+            { id, name: `Cadre de ${zone.name}`, mask: null, finish: null, quad: null, repetitions: 4, lumiere: zone.lumiere, visible: true, surface: "cadre", aspect: null, auto: false, m2: null, rotation: 0 },
           ],
         }));
         setActiveZoneId(id);
@@ -981,94 +1069,196 @@ export function Workspace({
       ombres: dessin(null, { foregroundErase: true }),
     };
   }
+  const selection = maSelection(scene, products, finishes, { pro: tarifPro, discount });
+  const nbSel = selection.finitions.length + selection.objets.reduce((n, o) => n + o.quantite, 0);
+  async function presenter() {
+    setSelOuverte(false);
+    setPresente({ avant: null, apres: null });
+    try {
+      await flush();
+      const c = await calquesOptimisation();
+      const opt = scene.optimise && scene.optimise.cle === compositionKey(scene, basePath) ? photoUrl(scene.optimise.image) : null;
+      const apres = opt ?? (await canvasToDataUrl(c.montage, "image/jpeg", 0.92));
+      const b = newCanvas(W, H);
+      b.getContext("2d")!.drawImage(baseImg!, 0, 0, W, H);
+      setPresente({ avant: await canvasToDataUrl(b, "image/jpeg", 0.9), apres });
+    } catch (e) {
+      setPresente(null);
+      toast.error(e instanceof Error ? e.message : "Présentation impossible");
+    }
+  }
+  async function telechargerPdf() {
+    if (!presente?.apres) return;
+    const enJpeg = async (src: string) => {
+      if (src.startsWith("data:")) return src;
+      const img = await loadImage(src);
+      const c = newCanvas(img.naturalWidth, img.naturalHeight);
+      c.getContext("2d")!.drawImage(img, 0, 0);
+      return canvasToDataUrl(c, "image/jpeg", 0.92);
+    };
+    const sel = selection;
+    const titre = projet?.nom ?? variant.name;
+    const res = await fetch("/api/pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fichier: `${titre} - ${variant.name}`,
+        titre,
+        client: projet?.client ?? null,
+        variante: variant.name,
+        date: new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" }).format(new Date()),
+        avant: presente.avant,
+        apres: await enJpeg(presente.apres),
+        selection: {
+          ...sel,
+          finitions: sel.finitions.map((f) => ({ ...f, zones: f.zones.map((z) => z.nom) })),
+        },
+      }),
+    });
+    if (!res.ok) throw new Error("PDF impossible : " + ((await res.json().catch(() => null))?.error?.message ?? res.status));
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${titre} - ${variant.name}.pdf`.replace(/[\\/:*?"<>|]+/g, " ");
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    toast.success("PDF enregistré dans vos Téléchargements");
+  }
   const cleComposition = compositionKey(scene, basePath);
   const optimiseValide = scene.optimise && scene.optimise.cle === cleComposition ? scene.optimise : null;
 
+  const surfaceOuverte = activeZone && panel === "murs" ? activeZone : null;
   return (
-    <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)_280px]">
-      <aside className="surface order-2 p-3 xl:order-1 print:hidden">
-        <Tabs value={panel} onValueChange={setPanel}>
-          <TabsList className="mb-3 grid w-full grid-cols-3">
-            <TabsTrigger value="murs" className="gap-1"><Paintbrush2 className="h-3.5 w-3.5" /> Murs</TabsTrigger>
-            <TabsTrigger value="articles" className="gap-1"><Package className="h-3.5 w-3.5" /> Articles</TabsTrigger>
-            <TabsTrigger value="photo" className="gap-1"><ImageIcon className="h-3.5 w-3.5" /> Photo</TabsTrigger>
-          </TabsList>
-          <TabsContent value="murs"><PanelMurs api={api} /></TabsContent>
-          <TabsContent value="articles"><PanelArticles api={api} /></TabsContent>
-          <TabsContent value="photo"><PanelPhoto api={api} /></TabsContent>
-        </Tabs>
-      </aside>
-      <section className="order-1 min-w-0 xl:order-2">
-        <div className="mb-2 flex items-center gap-1 print:hidden">
-          <Button size="sm" variant="ghost" disabled={!undo.current.canUndo} onClick={() => stepHistory("undo")} title="Annuler (Ctrl+Z)">
-            <Undo2 className="h-4 w-4" /> Annuler
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-1 print:hidden">
+        <Button size="sm" variant="ghost" disabled={!undo.current.canUndo} onClick={() => stepHistory("undo")} title="Annuler (Ctrl+Z)">
+          <Undo2 className="h-4 w-4" /> Annuler
+        </Button>
+        <Button size="sm" variant="ghost" disabled={!undo.current.canRedo} onClick={() => stepHistory("redo")} title="Rétablir (Ctrl+Y)">
+          <Redo2 className="h-4 w-4" /> Rétablir
+        </Button>
+        <span className="mx-1 h-6 w-px bg-border" />
+        <Button size="sm" variant={avantPart !== null ? "default" : "outline"} onClick={() => setAvantPart((x) => (x === null ? 0.5 : null))} title="Glissez sur la photo pour comparer avant / après">
+          <Columns2 className="h-4 w-4" /> Avant / après
+        </Button>
+        {(busy || finishing || analysing) && (
+          <span className="ml-2 flex items-center gap-1 text-xs text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" /> {busy ?? (analysing ? "Reconnaissance des surfaces…" : "Rendu…")}
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-1">
+          <Button size="sm" variant="outline" onClick={() => setSelOuverte(true)}>
+            <ShoppingBag className="h-4 w-4" /> Ma sélection{nbSel ? ` (${nbSel})` : ""}
           </Button>
-          <Button size="sm" variant="ghost" disabled={!undo.current.canRedo} onClick={() => stepHistory("redo")} title="Rétablir (Ctrl+Y)">
-            <Redo2 className="h-4 w-4" /> Rétablir
+          <Button size="sm" variant="hero" disabled={!baseImg} onClick={() => void presenter()}>
+            <IconePresentation className="h-4 w-4" /> Présenter au client
           </Button>
-          <span className="text-xs text-muted-foreground">articles, réglages et finitions</span>
-          <div className="ml-auto flex items-center gap-2">
-            {optimiseValide && (
-              <a href={photoUrl(optimiseValide.image)} target="_blank" rel="noreferrer" className="text-xs text-primary underline">
-                Rendu optimisé gardé ({optimiseValide.duree.toLocaleString("fr-FR")} s)
-              </a>
-            )}
-            <Button
-              size="sm"
-              variant="hero"
-              disabled={!!busy || finishing}
-              title="Télécharger le visuel et la consigne à donner à une IA pour un rendu 3D"
-              onClick={() => setExportOuvert(true)}
-            >
-              <Sparkles className="h-4 w-4" /> Exporter pour l'IA
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="ghost" aria-label="Plus d'actions"><MoreHorizontal className="h-4 w-4" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setExportOuvert(true)}><Sparkles className="h-4 w-4" /> Exporter pour une IA (visuel + consigne)</DropdownMenuItem>
+              <DropdownMenuItem disabled={!scene.items.length} onSelect={() => setOptimOuvert(true)}><Sparkles className="h-4 w-4" /> Optimiser sur ce PC (IA locale)</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setPanel("photo")}><ImageIcon className="h-4 w-4" /> Retoucher la photo (gomme, décor)</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-        <Stage
-          ref={stage}
-          W={W}
-          H={H}
-          background={background}
-          items={scene.items}
-          asset={assetFor}
-          foreground={foreground}
-          overlay={overlay ?? apercuSurvol}
-          overlayLabel={overlayLabel}
-          selected={selectedUid}
-          tool={tool}
-          brush={brush}
-          quad={activeZone?.quad ?? null}
-          cast={scene.cast}
-          onSelect={setSelectedUid}
-          onItemChange={updateItem}
-          onItemCommit={() => undefined}
-          onStroke={onStroke}
-          onStrokeEnd={onStrokeEnd}
-          onClickImage={(p) => {
-            if (tool === "deplacer") return;
-            void onClickImage(p);
-          }}
-          onQuadChange={(q: Quad) => activeZone && api.updateZone(activeZone.id, { quad: q })}
-          onHoverImage={(p) => {
-            if (tool !== "peindre" || !pinceau) return;
-            const id = p && p[0] >= 0 && p[1] >= 0 && p[0] < W && p[1] < H ? (surfaceSous(p)?.id ?? null) : null;
-            if (id !== survol) setSurvol(id);
-          }}
-        />
-        {(busy || finishing) && (
-          <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" /> {busy ?? "Application des finitions…"}
-          </p>
-        )}
-        {!busy && !finishing && (
-          <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground print:hidden">
-            <Brush className="h-3 w-3" /> Molette : zoom · clic droit maintenu : déplacer la vue · {W} × {H} px, format d'origine conservé.
-          </p>
-        )}
-      </section>
-      <aside className="order-3 print:hidden">
-        <PanelReferences api={api} discount={discount} />
-      </aside>
+      </div>
+      <div className="flex min-h-0 flex-1 gap-3">
+        <section className="relative min-h-[420px] min-w-0 flex-1">
+          <Stage
+            ref={stage}
+            remplir
+            W={W}
+            H={H}
+            background={background}
+            items={scene.items}
+            asset={assetFor}
+            foreground={foreground}
+            overlay={overlay ?? apercuSurvol}
+            overlayLabel={
+              overlayLabel ??
+              (tool === "deplacer" && zoneSurvolee
+                ? `${zoneSurvolee.name}${zoneSurvolee.finish ? ` · ${zoneSurvolee.finish.name}` : ""} — cliquez pour l'habiller`
+                : undefined)
+            }
+            contour={contour}
+            avant={avantPart !== null && baseImg ? { image: baseImg, part: avantPart } : null}
+            onAvantChange={setAvantPart}
+            selected={selectedUid}
+            tool={tool}
+            brush={brush}
+            quad={activeZone?.quad ?? null}
+            cast={scene.cast}
+            onSelect={(uid) => {
+              setSelectedUid(uid);
+              if (uid) {
+                setPanel("articles");
+                setActiveZoneId(null);
+              }
+            }}
+            onItemChange={updateItem}
+            onItemCommit={() => undefined}
+            onStroke={onStroke}
+            onStrokeEnd={onStrokeEnd}
+            onClickImage={(p) => void onClickImage(p)}
+            onQuadChange={(q: Quad) => activeZone && api.updateZone(activeZone.id, { quad: q })}
+            onHoverImage={(p) => {
+              if (tool !== "deplacer" && tool !== "peindre" && tool !== "pipette") return;
+              const id = p && p[0] >= 0 && p[1] >= 0 && p[0] < W && p[1] < H ? (surfaceSous(p)?.id ?? null) : null;
+              if (id !== survol) setSurvol(id);
+            }}
+            onDropImage={(p, data) => {
+              const id = data.getData("text/x-produit");
+              const prod = products.find((x) => x.id === id);
+              if (!prod) return;
+              api.addItem(prod);
+              const uid = sceneRef.current.items.at(-1)?.uid;
+              if (uid) updateItem(uid, { x: p[0] / W, y: p[1] / H });
+              setTool("deplacer");
+              setPanel("articles");
+            }}
+          />
+        </section>
+        <aside className="flex w-[340px] shrink-0 flex-col overflow-hidden rounded-lg border bg-card print:hidden">
+          <Tabs value={panel === "photo" ? "photo" : panel} onValueChange={setPanel} className="flex min-h-0 flex-1 flex-col">
+            <TabsList className="m-2 grid grid-cols-2">
+              <TabsTrigger value="murs" className="gap-1"><Paintbrush2 className="h-3.5 w-3.5" /> Surfaces</TabsTrigger>
+              <TabsTrigger value="articles" className="gap-1"><Package className="h-3.5 w-3.5" /> Objets</TabsTrigger>
+            </TabsList>
+            <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+              <TabsContent value="murs" className="mt-0">{surfaceOuverte ? <PanneauSurface key={surfaceOuverte.id} api={api} z={surfaceOuverte} /> : <ListeSurfaces api={api} />}</TabsContent>
+              <TabsContent value="articles" className="mt-0"><PanelArticles api={api} /></TabsContent>
+              <TabsContent value="photo" className="mt-0">
+                <Button size="sm" variant="ghost" className="mb-2" onClick={() => setPanel("murs")}>← Retour</Button>
+                <PanelPhoto api={api} />
+              </TabsContent>
+            </div>
+          </Tabs>
+        </aside>
+      </div>
+      <MaSelectionSheet
+        open={selOuverte}
+        onOpenChange={setSelOuverte}
+        sel={selection}
+        onM2={(id, m2) => api.updateZone(id, { m2 })}
+        pro={tarifPro}
+        onPro={(v) => {
+          setTarifPro(v);
+          localStorageSet("studio-tarif", v ? "pro" : "public");
+        }}
+      />
+      <Presentation
+        open={!!presente}
+        onClose={() => setPresente(null)}
+        titre={projet?.nom ?? variant.name}
+        sousTitre={[projet?.client, variant.name].filter(Boolean).join(" · ")}
+        avant={presente?.avant ?? null}
+        apres={presente?.apres ?? null}
+        sel={selection}
+        onPdf={telechargerPdf}
+      />
       <ExportIaDialog
         open={exportOuvert}
         onOpenChange={setExportOuvert}

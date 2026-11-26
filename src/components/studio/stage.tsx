@@ -51,6 +51,11 @@ export function Stage({
   onClickImage,
   onQuadChange,
   onHoverImage,
+  onDropImage,
+  onAvantChange,
+  remplir,
+  avant,
+  contour,
 }: {
   ref?: Ref<StageHandle>;
   W: number;
@@ -75,10 +80,20 @@ export function Stage({
   onQuadChange: (q: Quad) => void;
   /** Position survolée (coordonnées image), null en sortant : aperçu avant le clic. */
   onHoverImage?: (p: Point | null) => void;
+  /** Dépôt d'un article glissé depuis le catalogue (coordonnées image). */
+  onDropImage?: (p: Point, data: DataTransfer) => void;
+  onAvantChange?: (part: number) => void;
+  /** Le plan occupe toute la hauteur de son conteneur (photo au centre de l'écran). */
+  remplir?: boolean;
+  /** Rideau avant / après : la photo d'origine à gauche de « part » (0..1). */
+  avant?: { image: CanvasImageSource; part: number } | null;
+  /** Contour de la surface survolée (dessiné opaque, au-dessus de tout). */
+  contour?: CanvasImageSource | null;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const boxes = useRef(new Map<string, Box>());
+  const fondContour = useRef<HTMLCanvasElement | null>(null);
   const [v, setV] = useState<View>({ scale: 1, ox: 0, oy: 0 });
   const [hover, setHover] = useState<Point | null>(null);
   const drag = useRef<
@@ -87,6 +102,8 @@ export function Stage({
     | { kind: "pan"; x: number; y: number; v: View }
     | { kind: "brush"; last: Point }
     | { kind: "corner"; i: number }
+    | { kind: "rotate"; uid: string; ax: number; ay: number }
+    | { kind: "rideau" }
     | null
   >(null);
 
@@ -104,7 +121,7 @@ export function Stage({
       const cw = w.clientWidth;
       if (!cw) return;
       // Hauteur du plan : celle de l'image à pleine largeur, bornée à l'écran.
-      const ch = Math.max(280, Math.min(window.innerHeight * 0.72, (cw * H) / Math.max(1, W)));
+      const ch = remplir ? Math.max(280, w.clientHeight) : Math.max(280, Math.min(window.innerHeight * 0.72, (cw * H) / Math.max(1, W)));
       const pw = Math.round(cw * dpr), ph = Math.round(ch * dpr);
       if (c.width === pw && c.height === ph) return;
       c.style.height = `${ch}px`;
@@ -120,7 +137,7 @@ export function Stage({
       ro.disconnect();
       window.removeEventListener("resize", size);
     };
-  }, [W, H]);
+  }, [W, H, remplir]);
 
   // Dessin à chaque rendu.
   useEffect(() => {
@@ -132,13 +149,44 @@ export function Stage({
     if (!background) return;
     ctx.setTransform(v.scale, 0, 0, v.scale, v.ox, v.oy);
     boxes.current.clear();
-    drawComposition(ctx, { W, H, background, items, asset, foreground, boxes: boxes.current, ...(cast ? { cast } : {}) });
+    // Le contour d'une surface passe sous les objets posés (il cerne le mur, pas le fauteuil).
+    let fond = background;
+    if (contour && background) {
+      const t = (fondContour.current ??= document.createElement("canvas"));
+      if (t.width !== W || t.height !== H) { t.width = W; t.height = H; }
+      const tc = t.getContext("2d")!;
+      tc.clearRect(0, 0, W, H);
+      tc.drawImage(background, 0, 0, W, H);
+      tc.drawImage(contour, 0, 0, W, H);
+      fond = t;
+    }
+    drawComposition(ctx, { W, H, background: fond, items, asset, foreground, boxes: boxes.current, ...(cast ? { cast } : {}) });
     if (overlay) {
       ctx.globalAlpha = 0.5;
       ctx.drawImage(overlay, 0, 0, W, H);
       ctx.globalAlpha = 1;
     }
     const px = 1 / v.scale;
+    if (avant) {
+      const xa = Math.max(0, Math.min(1, avant.part)) * W;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, xa, H);
+      ctx.clip();
+      ctx.drawImage(avant.image, 0, 0, W, H);
+      ctx.restore();
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(xa - 1.5 * px, 0, 3 * px, H);
+      ctx.beginPath();
+      ctx.arc(xa, H / 2, 16 * px, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#2d2621";
+      ctx.font = `${12 * px}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("‹ ›", xa, H / 2);
+    }
+    if (contour && !background) ctx.drawImage(contour, 0, 0, W, H);
     const sel = selected ? boxes.current.get(selected) : null;
     if (sel && (tool === "deplacer" || tool === "main")) {
       ctx.strokeStyle = "#c0694a";
@@ -160,6 +208,16 @@ export function Stage({
       ctx.strokeStyle = "#c0694a";
       ctx.fillRect(sel.x + sel.w - 7 * px, sel.y - 7 * px, 14 * px, 14 * px);
       ctx.strokeRect(sel.x + sel.w - 7 * px, sel.y - 7 * px, 14 * px, 14 * px);
+      // poignée de rotation (rond au-dessus de l'article)
+      const rx = sel.x + sel.w / 2, ry = sel.y - 26 * px;
+      ctx.beginPath();
+      ctx.moveTo(rx, sel.y);
+      ctx.lineTo(rx, ry + 8 * px);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(rx, ry, 8 * px, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
     }
     if (quad && tool === "coins") {
       const pts = quad.map(([x, y]) => [x * W, y * H] as Point);
@@ -217,14 +275,26 @@ export function Stage({
       onClickImage(p);
       return;
     }
-    // Déplacer : poignée d'échelle de l'article sélectionné, sinon article sous le pointeur.
+    // Avant / après : le rideau se déplace en cliquant-glissant n'importe où.
+    if (avant && onAvantChange) {
+      drag.current = { kind: "rideau" };
+      onAvantChange(p[0] / W);
+      return;
+    }
+    // Déplacer : poignées (échelle, rotation) de l'article sélectionné, sinon article sous le pointeur.
     const sel = selected ? boxes.current.get(selected) : null;
+    if (sel && Math.hypot(p[0] - (sel.x + sel.w / 2), p[1] - (sel.y - 26 / v.scale)) < 12 / v.scale) {
+      drag.current = { kind: "rotate", uid: selected!, ax: sel.x + sel.w / 2, ay: sel.y + sel.h };
+      return;
+    }
     if (sel && Math.abs(p[0] - (sel.x + sel.w)) < 12 / v.scale && Math.abs(p[1] - sel.y) < 12 / v.scale) {
       drag.current = { kind: "scale", uid: selected!, baseY: sel.y + sel.h };
       return;
     }
     const uid = hitItem(items, boxes.current, p[0], p[1]);
     onSelect(uid);
+    // Clic hors des articles : la surface sous le pointeur (mur, sol…) est choisie.
+    if (!uid) onClickImage(p);
     if (uid) {
       const it = items.find((i) => i.uid === uid)!;
       drag.current = { kind: "item", uid, dx: p[0] - it.x * W, dy: p[1] - it.y * H };
@@ -243,6 +313,11 @@ export function Stage({
       setV({ ...d.v, ox: d.v.ox + (e.clientX - d.x) * k, oy: d.v.oy + (e.clientY - d.y) * k });
     } else if (d.kind === "item") {
       onItemChange(d.uid, { x: (p[0] - d.dx) / W, y: (p[1] - d.dy) / H });
+    } else if (d.kind === "rideau") {
+      onAvantChange?.(Math.max(0, Math.min(1, p[0] / W)));
+    } else if (d.kind === "rotate") {
+      const deg = (Math.atan2(p[0] - d.ax, d.ay - p[1]) * 180) / Math.PI;
+      onItemChange(d.uid, { rot: Math.round(Math.max(-180, Math.min(180, deg))) });
     } else if (d.kind === "scale") {
       onItemChange(d.uid, { h: Math.max(0.02, (d.baseY - p[1]) / H) });
     } else if (d.kind === "brush") {
@@ -260,7 +335,7 @@ export function Stage({
     drag.current = null;
     if (!d) return;
     if (d.kind === "brush") onStrokeEnd();
-    if (d.kind === "item" || d.kind === "scale") onItemCommit();
+    if (d.kind === "item" || d.kind === "scale" || d.kind === "rotate") onItemCommit();
   }
 
   function wheel(e: React.WheelEvent<HTMLCanvasElement>) {
@@ -277,7 +352,23 @@ export function Stage({
     tool === "main" ? "cursor-grab" : tool === "deplacer" ? "cursor-default" : tool === "coins" ? "cursor-move" : BRUSH_TOOLS.includes(tool) ? "cursor-none" : "cursor-crosshair";
 
   return (
-    <div ref={wrap} className="relative overflow-hidden rounded-lg border bg-[repeating-conic-gradient(#ece8e1_0%_25%,#f6f3ee_0%_50%)] bg-[length:20px_20px]">
+    <div
+      ref={wrap}
+      className={cn("relative overflow-hidden rounded-lg border bg-[repeating-conic-gradient(#ece8e1_0%_25%,#f6f3ee_0%_50%)] bg-[length:20px_20px]", remplir && "h-full")}
+      onDragOver={(e) => {
+        if (onDropImage) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "copy";
+        }
+      }}
+      onDrop={(e) => {
+        const c = canvas.current;
+        if (!onDropImage || !c) return;
+        e.preventDefault();
+        const r = c.getBoundingClientRect();
+        onDropImage(toImage(v, ((e.clientX - r.left) * c.width) / r.width, ((e.clientY - r.top) * c.height) / r.height), e.dataTransfer);
+      }}
+    >
       <canvas
         ref={canvas}
         aria-label="Plan de travail du studio"
