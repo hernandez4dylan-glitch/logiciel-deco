@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { FileDown, ListChecks, Loader2, X } from "lucide-react";
+import { Camera, FileDown, ListChecks, Loader2, RefreshCw, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import type { MaSelection } from "@/lib/selection";
@@ -17,6 +17,7 @@ export function Presentation({
   apres,
   sel,
   onPdf,
+  ia,
 }: {
   open: boolean;
   onClose: () => void;
@@ -26,11 +27,24 @@ export function Presentation({
   /** Visuel final (data URL) ; null pendant le calcul en pleine résolution. */
   apres: string | null;
   sel: MaSelection;
-  onPdf: () => Promise<void>;
+  /** Télécharge le PDF avec le visuel affiché. */
+  onPdf: (visuel: string) => Promise<void>;
+  /** Rendu photo réaliste par IA locale (module optionnel). */
+  ia?: {
+    disponible: boolean;
+    /** Visuel réaliste déjà calculé pour cette composition. */
+    image: string | null;
+    /** Calcul en cours. */
+    etat: { progression: number; message: string } | null;
+    lancer: () => void;
+    annuler: () => void;
+  };
 }) {
   const [part, setPart] = useState(0.5);
   const [liste, setListe] = useState(false);
   const [pdf, setPdf] = useState(false);
+  const [realiste, setRealiste] = useState(true);
+  const visuel = ia?.image && realiste ? ia.image : apres;
   const zone = useRef<HTMLDivElement>(null);
   const glisse = useRef(false);
 
@@ -55,15 +69,32 @@ export function Presentation({
           <p className="truncate text-xs text-white/60">{sousTitre}</p>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          {ia?.image && (
+            <div className="flex rounded-md bg-white/10 p-0.5 text-xs" role="group" aria-label="Visuel affiché">
+              <button type="button" onClick={() => setRealiste(false)} className={cn("rounded px-2.5 py-1", !realiste && "bg-white text-[#1d1915]")}>Montage</button>
+              <button type="button" onClick={() => setRealiste(true)} className={cn("rounded px-2.5 py-1", realiste && "bg-white text-[#1d1915]")}>Photo réaliste</button>
+            </div>
+          )}
+          {ia?.disponible && ia.image && !ia.etat && (
+            <Button size="icon" variant="ghost" className="text-white hover:bg-white/10" aria-label="Refaire la photo réaliste" title="Refaire la photo réaliste (l'IA propose une autre version)" onClick={() => { setRealiste(true); ia.lancer(); }}>
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          )}
+          {ia?.disponible && !ia.image && !ia.etat && apres && (
+            <Button size="sm" variant="secondary" onClick={ia.lancer} title="L'IA installée sur ce PC redessine la lumière et les matières (1 à 5 minutes, sans Internet)">
+              <Sparkles className="h-4 w-4" /> Créer la photo réaliste
+            </Button>
+          )}
           <Button size="sm" variant="secondary" onClick={() => setListe((l) => !l)}><ListChecks className="h-4 w-4" /> {liste ? "Masquer la sélection" : "Ma sélection"}</Button>
           <Button
             size="sm"
             variant="hero"
-            disabled={pdf || !apres}
+            disabled={pdf || !visuel || !!ia?.etat}
             onClick={async () => {
+              if (!visuel) return;
               setPdf(true);
               try {
-                await onPdf();
+                await onPdf(visuel);
               } catch (e) {
                 toast.error(e instanceof Error ? e.message : "PDF impossible");
               } finally {
@@ -88,7 +119,7 @@ export function Presentation({
               onPointerMove={(e) => glisse.current && bouge(e.clientX)}
               onPointerUp={() => (glisse.current = false)}
             >
-              <img src={apres} alt="Proposition" className="block max-h-[calc(100vh-110px)] max-w-full rounded shadow-2xl" draggable={false} />
+              <img src={visuel ?? apres} alt="Proposition" className="block max-h-[calc(100vh-110px)] max-w-full rounded shadow-2xl" draggable={false} />
               {avant && (
                 <img src={avant} alt="Avant" draggable={false} className="absolute inset-0 h-full w-full rounded" style={{ clipPath: `inset(0 ${100 - part * 100}% 0 0)` }} />
               )}
@@ -99,6 +130,18 @@ export function Presentation({
                   <span className="pointer-events-none absolute left-3 top-3 rounded bg-black/55 px-2 py-0.5 text-xs">Avant</span>
                   <span className="pointer-events-none absolute right-3 top-3 rounded bg-black/55 px-2 py-0.5 text-xs">Après</span>
                 </>
+              )}
+              {ia?.etat && (
+                <div className="absolute inset-x-6 bottom-6 rounded-lg bg-black/70 p-3 text-sm backdrop-blur" onPointerDown={(e) => e.stopPropagation()}>
+                  <div className="mb-2 flex items-center gap-2">
+                    <Camera className="h-4 w-4 animate-pulse" />
+                    <span className="min-w-0 flex-1 truncate">Photo réaliste en préparation : {ia.etat.message}</span>
+                    <Button size="sm" variant="ghost" className="h-7 text-white hover:bg-white/10" onClick={ia.annuler}>Annuler</Button>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded bg-white/20">
+                    <div className="h-full bg-white transition-all" style={{ width: `${Math.round(ia.etat.progression * 100)}%` }} />
+                  </div>
+                </div>
               )}
             </div>
           )}

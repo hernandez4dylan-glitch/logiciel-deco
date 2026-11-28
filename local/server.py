@@ -47,6 +47,14 @@ class Handler(BaseHTTPRequestHandler):
         if not self.allowed(): return self.reply(403,b'Forbidden','text/plain')
         path=unquote(urlsplit(self.path).path)
         if path=='/api/health': return self.reply(200,SIGNATURE,'text/plain')
+        if path.startswith('/api/rendu-ia'):
+            import rendu_ia_taches as ria
+            try:
+                ident=path[len('/api/rendu-ia/'):] if path.startswith('/api/rendu-ia/') else ''
+                data=ria.etat(ident,IMAGES) if ident else {'disponible':ria.disponible()}
+                return self.reply(200,json.dumps({'data':data,'error':None}).encode(),'application/json')
+            except Exception as exc:
+                return self.reply(400,json.dumps({'error':{'message':str(exc)}}).encode(),'application/json')
         if path=='/api/backup':
             buf=io.BytesIO()
             with GATE, zipfile.ZipFile(buf,'w',zipfile.ZIP_DEFLATED) as out:
@@ -85,6 +93,12 @@ class Handler(BaseHTTPRequestHandler):
                 # Analyse de pièce et optimisation : réponse JSON (zones, durées) ; sinon une image PNG.
                 if isinstance(out,dict): return self.reply(200,json.dumps({'data':out,'error':None}).encode(),'application/json')
                 return self.reply(200,out,'image/png')
+            elif self.path.startswith('/api/rendu-ia'):
+                import rendu_ia_taches as ria
+                m=re.fullmatch(r'/api/rendu-ia/([0-9a-f]{32})/annuler',self.path)
+                if m: ria.annuler(m.group(1)); result={'annule':True}
+                elif self.path=='/api/rendu-ia': result={'id':ria.lancer(json.loads(raw))}
+                else: return self.reply(404,b'Introuvable','text/plain')
             elif self.path=='/api/pdf':
                 from pdf import proposition
                 d=json.loads(raw)

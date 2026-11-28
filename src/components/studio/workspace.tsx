@@ -1087,8 +1087,92 @@ export function Workspace({
       toast.error(e instanceof Error ? e.message : "Présentation impossible");
     }
   }
-  async function telechargerPdf() {
-    if (!presente?.apres) return;
+  // Rendu photo réaliste par IA locale (module optionnel runtime\ia-rendu).
+  const [iaDispo, setIaDispo] = useState(false);
+  const [iaEtat, setIaEtat] = useState<{ progression: number; message: string } | null>(null);
+  const iaTache = useRef<string | null>(null);
+  useEffect(() => {
+    fetch("/api/rendu-ia")
+      .then((r) => r.json())
+      .then((b) => setIaDispo(!!b?.data?.disponible))
+      .catch(() => setIaDispo(false));
+    return () => {
+      const id = iaTache.current;
+      iaTache.current = null;
+      if (id) void fetch(`/api/rendu-ia/${id}/annuler`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    };
+  }, []);
+  /** Niveaux de gris (blanc = sélection) à partir de calques dont l'alpha est la sélection. */
+  function enGris(calques: HTMLCanvasElement[]) {
+    const c = newCanvas(W, H);
+    const ctx = c.getContext("2d")!;
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, W, H);
+    for (const m of calques) {
+      const t = newCanvas(W, H);
+      const tc = t.getContext("2d")!;
+      tc.drawImage(m, 0, 0, W, H);
+      tc.globalCompositeOperation = "source-in";
+      tc.fillStyle = "#fff";
+      tc.fillRect(0, 0, W, H);
+      ctx.drawImage(t, 0, 0);
+    }
+    return c;
+  }
+  async function lancerRenduIa() {
+    setIaEtat({ progression: 0, message: "Préparation des calques…" });
+    try {
+      await flush();
+      const cle = compositionKey(scene, basePathRef.current);
+      const c = await calquesOptimisation();
+      const finies = scene.zones.filter((z) => z.finish && z.visible && masks.current.get(z.id));
+      const res = await fetch("/api/rendu-ia", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          montage: await canvasToDataUrl(c.montage, "image/jpeg", 0.93),
+          zones: await canvasToDataUrl(enGris(finies.map((z) => masks.current.get(z.id)!)), "image/png"),
+          objets: scene.items.length ? await canvasToDataUrl(enGris([c.articles]), "image/png") : null,
+          surfaces: finies.map((z) => ({ surface: z.surface, kind: z.finish!.kind, nom: z.finish!.name })),
+          // Première version reproductible ; « Refaire » en propose une autre.
+          graine: scene.renduIa ? 1 + Math.floor(Math.random() * 1e6) : 7,
+        }),
+      });
+      const b = await res.json().catch(() => null);
+      if (!res.ok || !b?.data?.id) throw new Error(b?.error?.message ?? "Rendu réaliste impossible");
+      const id: string = b.data.id;
+      iaTache.current = id;
+      for (;;) {
+        await new Promise((r) => setTimeout(r, 1500));
+        if (iaTache.current !== id) return;
+        const e = await (await fetch(`/api/rendu-ia/${id}`)).json().catch(() => null);
+        const d = e?.data;
+        if (!d) throw new Error(e?.error?.message ?? "Rendu réaliste interrompu");
+        if (d.erreur) throw new Error(d.erreur);
+        setIaEtat({ progression: d.progression ?? 0, message: d.message ?? "" });
+        if (d.image) {
+          setScene((s) => ({ ...s, renduIa: { image: d.image, cle, duree: d.duree ?? 0 } }));
+          toast.success(`Photo réaliste prête${d.duree ? ` (${Math.round(d.duree)} s)` : ""} : elle sert à la présentation et au PDF`);
+          return;
+        }
+        if (d.termine) throw new Error("Rendu réaliste interrompu");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Rendu réaliste impossible");
+    } finally {
+      iaTache.current = null;
+      setIaEtat(null);
+    }
+  }
+  function annulerRenduIa() {
+    const id = iaTache.current;
+    iaTache.current = null;
+    setIaEtat(null);
+    if (id) void fetch(`/api/rendu-ia/${id}/annuler`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  }
+  async function telechargerPdf(visuel?: string) {
+    const image = visuel ?? presente?.apres;
+    if (!presente || !image) return;
     const enJpeg = async (src: string) => {
       if (src.startsWith("data:")) return src;
       const img = await loadImage(src);
@@ -1108,7 +1192,7 @@ export function Workspace({
         variante: variant.name,
         date: new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" }).format(new Date()),
         avant: presente.avant,
-        apres: await enJpeg(presente.apres),
+        apres: await enJpeg(image),
         selection: {
           ...sel,
           finitions: sel.finitions.map((f) => ({ ...f, zones: f.zones.map((z) => z.nom) })),
@@ -1258,6 +1342,13 @@ export function Workspace({
         apres={presente?.apres ?? null}
         sel={selection}
         onPdf={telechargerPdf}
+        ia={{
+          disponible: iaDispo,
+          image: scene.renduIa && scene.renduIa.cle === cleComposition ? photoUrl(scene.renduIa.image) : null,
+          etat: iaEtat,
+          lancer: () => void lancerRenduIa(),
+          annuler: annulerRenduIa,
+        }}
       />
       <ExportIaDialog
         open={exportOuvert}

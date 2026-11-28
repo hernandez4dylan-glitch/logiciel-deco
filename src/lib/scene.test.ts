@@ -111,6 +111,12 @@ describe("composition enregistrée", () => {
     expect(vieux.zones[0]!.finish).toBeNull();
     expect(vieux.zones[0]).toMatchObject({ surface: "mur", aspect: null, auto: false, m2: null, rotation: 0 });
   });
+  it("garde le rendu photo réaliste à l'enregistrement, l'ignore s'il est incomplet", () => {
+    const s: Scene = { ...newScene(), renduIa: { image: "rendu-ia-1.jpg", cle: "abc", duree: 92 } };
+    expect(parseScene(serializeScene(s)).renduIa).toEqual({ image: "rendu-ia-1.jpg", cle: "abc", duree: 92 });
+    expect(parseScene(JSON.stringify({ ...newScene(), renduIa: { image: "x.jpg" } })).renduIa).toBeNull();
+    expect(parseScene(JSON.stringify({ version: 1 })).renduIa).toBeNull();
+  });
   it("duplique une variante sans lien avec l'originale", () => {
     const s: Scene = { ...newScene(), items: [item()] };
     const d = duplicateScene(s);

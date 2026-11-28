@@ -21,6 +21,19 @@ d'usage dans local/modeles/LISEZ-MOI-MODELES.txt ; textes complets dans local/mo
 - TAESD (madebyollin, licence MIT) — auto-encodeur compact.
 - onnxruntime 1.20.1 (Microsoft, licence MIT), dans runtime/windows/packages.
 Le code qui les exécute (local/analyse.py, local/optimisation.py) est écrit pour ce logiciel.
+
+Module optionnel « Photo réaliste » (dossier runtime/ia-rendu, non versionné, ≈ 4 Go) — IA générative
+exécutée sur ce PC, sans Internet ; bibliothèques listées dans local/outils/ia_rendu/requirements.txt :
+- Realistic Vision V5.1 inpainting (SG161222, CreativeML OpenRAIL-M, mêmes restrictions d'usage que
+  Stable Diffusion 1.5 : annexe A, local/modeles/licences) — dessin réaliste des surfaces.
+- ControlNet v1.1 Depth SD 1.5 (lllyasviel, CreativeML OpenRAIL-M) — respect de la géométrie de la pièce.
+- LCM-LoRA SD 1.5 (latent-consistency, CreativeML OpenRAIL++-M) — calcul en peu d'étapes.
+- sd-vae-ft-mse (Stability AI, licence MIT) — décodeur d'image.
+- Depth Anything Small (LiheYoung, licence Apache 2.0) — profondeur.
+- Fichiers de configuration de stable-diffusion-v1-5/stable-diffusion-inpainting (CreativeML OpenRAIL-M).
+- Python 3.12 (PSF), PyTorch 2.15 CPU (BSD-3), diffusers, transformers, accelerate, peft (Apache 2.0),
+  huggingface_hub (Apache 2.0), NumPy (BSD-3), OpenCV (Apache 2.0), Pillow (MIT-CMU).
+Le code qui les exécute (local/rendu_ia.py, local/rendu_ia_taches.py) est écrit pour ce logiciel.
 Les motifs d'exemple public/images/motifs/feuillage.png, enduit-taloche.jpg et parquet-chene.jpg sont générés par
 local/tests/generer_motifs.py pour ce logiciel (aucune image tierce).
 

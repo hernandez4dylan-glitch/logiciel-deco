@@ -162,6 +162,25 @@ Demande : reprendre entièrement l'onglet ; garder l'outil d'objets, le catalogu
   et la pièce d'angle) ; corniche et coffre de volet non reconnus (pinceau « Ajouter ») ; une plinthe sous
   un habillage (placards) n'est plus détectée quand le mur au-dessus n'est pas un mur.
 
+## Photo réaliste par IA générative locale (28/11/2026)
+Demande : un visuel « comme une IA » (réaliste), après essai concluant sur la photo du salon.
+- [x] Module optionnel runtime/ia-rendu : Python 3.12 autonome + PyTorch CPU + diffusers (0,9 Go) et modèles
+  (3,2 Go) : Realistic Vision 5.1 inpainting, ControlNet profondeur, LCM-LoRA, VAE ft-mse, Depth Anything small.
+  Hors ZIP et hors GitHub ; versions figées dans local/outils/ia_rendu/requirements.txt ; licences dans LICENCES.txt.
+- [x] local/rendu_ia.py : l'IA redessine les surfaces habillées et le pourtour des articles ; la teinte du nuancier
+  (chroma locale), la luminosité moyenne et les détails (motif, lames, grain) sont repris du montage ; autour des
+  articles l'IA ne peut qu'assombrir (ombre de contact, pas de halo clair) ; le reste de la photo est intact.
+- [x] Serveur : tâche en processus séparé, priorité basse, une à la fois, progression, annulation ; l'image est
+  rangée dans le dossier photos ; bouton absent si le module manque.
+- [x] Présentation : « Créer la photo réaliste », barre de progression, « Annuler », bascule « Montage / Photo
+  réaliste », « Refaire » (autre version) ; le PDF reprend le visuel affiché ; enregistré dans la proposition.
+- Vérifié dans le navigateur sur la vraie photo (Salon Durand, données de test) : rendu lancé depuis la
+  présentation, progression affichée, image prête en ≈ 3 min 30, conservée après rechargement, « Refaire »
+  fonctionne, PDF identique à la photo réaliste (écart moyen 0,04 / 255). 59 tests Python, 46 tests d'écrans.
+- Limites : 1 min 30 à 4 min par image sur ce PC (processeur, pas de carte graphique) ; l'IA calcule en
+  768 × 576 puis les détails sont repris du montage ; elle peut inventer une tache de soleil ou une prise ;
+  les défauts de contour du montage (bas de mur) restent visibles.
+
 ## Tâches
 - [x] Vérification automatique installée (.claude/hooks/verifier.ps1 + .claude/settings.json)
 - [x] Base : migrations sans perte (teintes/matières, photos d'article, projets, variantes) + tests

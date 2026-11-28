@@ -142,6 +142,8 @@ export type Scene = {
   baseHistory: BaseStep[];
   analyse: AnalyseInfo | null;
   optimise: Optimise | null;
+  /** Rendu photo réaliste (IA générative locale), valable tant que la composition ne change pas. */
+  renduIa: Optimise | null;
 };
 
 export type BaseStep = { base: string; visibles: string[]; foreground: string | null };
@@ -182,6 +184,7 @@ export const newScene = (): Scene => ({
   baseHistory: [],
   analyse: null,
   optimise: null,
+  renduIa: null,
 });
 
 /** Empreinte de ce qui se voit sur le visuel (photo, finitions, articles, ombres) : un
@@ -206,6 +209,12 @@ export function compositionKey(scene: Scene, basePath: string) {
 const num = (v: unknown, d: number, min = -Infinity, max = Infinity) =>
   typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : d;
 const str = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
+function lireOptimise(o: unknown): Optimise | null {
+  if (!o || typeof o !== "object") return null;
+  const r = o as Record<string, unknown>;
+  const image = str(r["image"]), cle = str(r["cle"]);
+  return image && cle ? { image, cle, duree: num(r["duree"], 0, 0, 3600) } : null;
+}
 const isPoint = (p: unknown): p is Point => Array.isArray(p) && p.length === 2 && p.every((n) => typeof n === "number" && Number.isFinite(n));
 
 /** Lit une composition enregistrée en tolérant les champs manquants (anciennes versions). */
@@ -239,12 +248,8 @@ export function parseScene(text: string | null | undefined): Scene {
         date: str(o["date"]) ?? "",
       };
     })(raw["analyse"]),
-    optimise: ((o: unknown): Optimise | null => {
-      if (!o || typeof o !== "object") return null;
-      const r = o as Record<string, unknown>;
-      const image = str(r["image"]), cle = str(r["cle"]);
-      return image && cle ? { image, cle, duree: num(r["duree"], 0, 0, 3600) } : null;
-    })(raw["optimise"]),
+    optimise: lireOptimise(raw["optimise"]),
+    renduIa: lireOptimise(raw["renduIa"]),
     baseHistory: (Array.isArray(raw["baseHistory"]) ? (raw["baseHistory"] as Record<string, unknown>[]) : [])
       .filter((h) => h && typeof h === "object" && typeof h["base"] === "string")
       .map((h) => ({

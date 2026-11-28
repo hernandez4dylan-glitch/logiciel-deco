@@ -94,6 +94,18 @@ Ouvrez « Espace Pro Décorateurs » : l'onglet « Espace décorateur » s'ouvre
    après, liste à la demande, aucun outil. « Télécharger le PDF » : nom du
    projet, photo d'origine, visuel final, références, quantités, prix unitaires
    et total, identiques à l'écran.
+7. « Créer la photo réaliste » (dans la présentation, si le module IA est
+   installé) : l'IA installée sur ce PC redessine la lumière et les matières des
+   surfaces habillées et pose les articles dans la pièce (ombres de contact), sans
+   Internet. Comptez 1 min 30 à 4 min sur ce PC ; une barre suit l'avancement et
+   « Annuler » l'arrête. La teinte exacte du nuancier, le motif du papier peint,
+   les lames du parquet et l'aspect des produits du catalogue sont conservés.
+   « Montage / Photo réaliste » bascule entre les deux visuels ; le PDF reprend
+   celui qui est affiché ; la flèche circulaire propose une autre version. La
+   photo réaliste est enregistrée avec la proposition et reste valable tant que
+   la composition ne change pas.
+   Module : dossier runtime\ia-rendu (≈ 4 Go, hors ZIP et hors GitHub) ; sans
+   lui, le bouton n'apparaît pas et tout le reste fonctionne.
 Annuler / Rétablir (ou Ctrl+Z / Ctrl+Y) sont toujours en haut à gauche.
 Le menu « … » garde l'export pour une IA d'images, l'optimisation sur ce PC et
 la retouche de la photo (gomme, décor).
