@@ -15,7 +15,7 @@ export const CONSIGNE_RENDU_3D =
   "N'ajoute aucun texte ni logo.";
 const CLE = "atelier.consigneRendu3D";
 
-function lireConsigne() {
+export function lireConsigne() {
   try {
     return window.localStorage.getItem(CLE) || CONSIGNE_RENDU_3D;
   } catch {

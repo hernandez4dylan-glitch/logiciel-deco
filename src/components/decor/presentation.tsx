@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, FileDown, ListChecks, Loader2, RefreshCw, Sparkles, X } from "lucide-react";
+import { Bot, Camera, FileDown, ListChecks, Loader2, RefreshCw, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import type { MaSelection } from "@/lib/selection";
 import { ListeAchat } from "@/components/decor/ma-selection";
+import { PontChatGpt } from "@/components/decor/pont-chatgpt";
 import { cn } from "@/lib/utils";
 
 /** Mode « Présenter au client » : le visuel en grand, rideau avant / après, la liste
@@ -18,6 +19,7 @@ export function Presentation({
   sel,
   onPdf,
   ia,
+  externe,
 }: {
   open: boolean;
   onClose: () => void;
@@ -39,11 +41,14 @@ export function Presentation({
     lancer: () => void;
     annuler: () => void;
   };
+  /** Rendu fait dans ChatGPT (compte de l'utilisateur) puis réimporté. */
+  externe?: { consigne: string; importer: (image: Blob) => Promise<void> };
 }) {
   const [part, setPart] = useState(0.5);
   const [liste, setListe] = useState(false);
   const [pdf, setPdf] = useState(false);
   const [realiste, setRealiste] = useState(true);
+  const [pont, setPont] = useState(false);
   const visuel = ia?.image && realiste ? ia.image : apres;
   const zone = useRef<HTMLDivElement>(null);
   const glisse = useRef(false);
@@ -83,6 +88,11 @@ export function Presentation({
           {ia?.disponible && !ia.image && !ia.etat && apres && (
             <Button size="sm" variant="secondary" onClick={ia.lancer} title="L'IA installée sur ce PC redessine la lumière et les matières (1 à 5 minutes, sans Internet)">
               <Sparkles className="h-4 w-4" /> Créer la photo réaliste
+            </Button>
+          )}
+          {externe && apres && (
+            <Button size="sm" variant="secondary" onClick={() => setPont((o) => !o)} title="Faire le rendu dans votre ChatGPT puis le reprendre ici">
+              <Bot className="h-4 w-4" /> Rendu avec ChatGPT
             </Button>
           )}
           <Button size="sm" variant="secondary" onClick={() => setListe((l) => !l)}><ListChecks className="h-4 w-4" /> {liste ? "Masquer la sélection" : "Ma sélection"}</Button>
@@ -146,6 +156,19 @@ export function Presentation({
             </div>
           )}
         </div>
+        {pont && externe && apres && (
+          <div className="absolute right-5 top-16 z-10 w-[420px]">
+            <PontChatGpt
+              visuel={apres}
+              consigne={externe.consigne}
+              onImporter={async (b) => {
+                await externe.importer(b);
+                setRealiste(true);
+              }}
+              onFermer={() => setPont(false)}
+            />
+          </div>
+        )}
         <aside className={cn("w-[380px] shrink-0 overflow-y-auto rounded-lg bg-white p-4 text-foreground", !liste && "hidden")}>
           <p className="mb-2 font-display text-lg">Ma sélection</p>
           <ListeAchat sel={sel} compacte />

@@ -181,6 +181,20 @@ Demande : un visuel « comme une IA » (réaliste), après essai concluant sur l
   768 × 576 puis les détails sont repris du montage ; elle peut inventer une tache de soleil ou une prise ;
   les défauts de contour du montage (bas de mur) restent visibles.
 
+## Rendu avec ChatGPT (28/11/2026)
+Demande : obtenir un rendu de la qualité d'une grande IA en ligne avec l'abonnement ChatGPT Pro (pas de clé API).
+- [x] Panneau « Rendu avec ChatGPT » dans la présentation : copier le visuel (PNG), ouvrir chatgpt.com, copier la
+  consigne (celle d'« Exporter pour l'IA » + finitions), reprendre l'image par Ctrl+V, glisser-déposer ou fichier.
+  Replis : visuel téléchargé si le presse-papiers est refusé, ancienne commande de copie pour la consigne.
+- [x] Image reprise recadrée au format de la photo (rideau avant / après aligné), rangée dans les photos, enregistrée
+  dans la proposition (même place que la photo réaliste locale), reprise par le PDF.
+- Vérifié dans le navigateur (données de test) : panneau, image 3:2 collée → recadrée en 2400 × 1800 et affichée,
+  conservée après rechargement, PDF généré avec cette image. La copie vers le presse-papiers n'a pas pu être
+  vérifiée dans le navigateur de test (permission refusée par ce navigateur) : le repli s'applique ; à vérifier
+  dans Edge sur le vrai logiciel.
+- Le logiciel ne se connecte pas à ChatGPT (un abonnement ChatGPT ne donne pas d'accès API ; piloter le site est
+  contraire à ses conditions).
+
 ## Tâches
 - [x] Vérification automatique installée (.claude/hooks/verifier.ps1 + .claude/settings.json)
 - [x] Base : migrations sans perte (teintes/matières, photos d'article, projets, variantes) + tests

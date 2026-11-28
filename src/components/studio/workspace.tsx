@@ -23,7 +23,7 @@ import { drawComposition, type ItemAsset } from "@/lib/render-scene";
 import { finishPayload, itemImagePath, loadAsset, renderFinished, renderFinishedApercu } from "@/lib/compose";
 import { defaultQuad, floorQuad, itemBox, surfaceLabel, parseScene, popHistory, pushHistory, serializeScene, type CastShadow, type Item, type Point, type Quad, type Scene, type Surface, type Zone, type AnalyseInfo, compositionKey, aspectLabel, zoneAspect } from "@/lib/scene";
 import { OptimisationDialog } from "@/components/studio/optimisation-dialog";
-import { ExportIaDialog } from "@/components/studio/export-ia-dialog";
+import { ExportIaDialog, lireConsigne } from "@/components/studio/export-ia-dialog";
 import { snapshotDe } from "@/lib/propositions";
 import { accordLight, stats as lumStats, UndoStack } from "@/lib/lumiere";
 import { sampleColor } from "@/lib/couleur";
@@ -1170,6 +1170,28 @@ export function Workspace({
     setIaEtat(null);
     if (id) void fetch(`/api/rendu-ia/${id}/annuler`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
   }
+  const finitionsTexte = scene.zones.filter((z) => z.finish && z.visible).map((z) => z.name + ' : ' + [z.finish!.marque, z.finish!.name].filter(Boolean).join(' ') + (z.finish!.kind === 'peinture' ? ', ' + aspectLabel(zoneAspect(z)).toLowerCase() : ''));
+  /** Rendu fait dans ChatGPT puis collé ici : recadré à la taille de la photo (rideau
+   *  avant / après aligné), rangé dans les photos, gardé avec la proposition. */
+  async function importerRenduExterne(b: Blob) {
+    const url = URL.createObjectURL(b);
+    try {
+      const img = await loadImage(url);
+      const c = newCanvas(W, H);
+      const ctx = c.getContext("2d")!;
+      const s = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+      const w = img.naturalWidth * s, h = img.naturalHeight * s;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+      const image = await uploadBlob("rendu-chatgpt", await canvasToBlob(c, "image/jpeg", 0.93), "jpg");
+      const cle = compositionKey(scene, basePathRef.current);
+      setScene((sc) => ({ ...sc, renduIa: { image, cle, duree: 0 } }));
+      const ecart = Math.abs(img.naturalWidth / img.naturalHeight - W / H) > 0.02;
+      toast.success(ecart ? "Rendu repris (recadré au format de la photo) : il sert à la présentation et au PDF" : "Rendu repris : il sert à la présentation et au PDF");
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
   async function telechargerPdf(visuel?: string) {
     const image = visuel ?? presente?.apres;
     if (!presente || !image) return;
@@ -1342,6 +1364,12 @@ export function Workspace({
         apres={presente?.apres ?? null}
         sel={selection}
         onPdf={telechargerPdf}
+        externe={{
+          consigne: finitionsTexte.length ? `${lireConsigne()}
+
+Finitions à respecter : ${finitionsTexte.join(" ; ")}.` : lireConsigne(),
+          importer: importerRenduExterne,
+        }}
         ia={{
           disponible: iaDispo,
           image: scene.renduIa && scene.renduIa.cle === cleComposition ? photoUrl(scene.renduIa.image) : null,
@@ -1356,7 +1384,7 @@ export function Workspace({
         montage={async () => (await calquesOptimisation()).montage}
         nom={variant.name}
         articles={scene.items.length}
-        details={scene.zones.filter((z) => z.finish && z.visible).map((z) => z.name + ' : ' + [z.finish!.marque, z.finish!.name].filter(Boolean).join(' ') + (z.finish!.kind === 'peinture' ? ', ' + aspectLabel(zoneAspect(z)).toLowerCase() : ''))}
+        details={finitionsTexte}
         onOptimiserIci={() => {
           setExportOuvert(false);
           setOptimOuvert(true);

@@ -106,6 +106,16 @@ Ouvrez « Espace Pro Décorateurs » : l'onglet « Espace décorateur » s'ouvre
    la composition ne change pas.
    Module : dossier runtime\ia-rendu (≈ 4 Go, hors ZIP et hors GitHub) ; sans
    lui, le bouton n'apparaît pas et tout le reste fonctionne.
+8. « Rendu avec ChatGPT » (dans la présentation) : pour un rendu « grande IA »
+   (soleil, reflets, tout redessiné), avec votre propre abonnement ChatGPT, sans
+   clé API. 1) « Copier » le visuel ; 2) « Ouvrir » ChatGPT et coller (Ctrl+V) ;
+   3) « Copier » la consigne, la coller dans ChatGPT et envoyer ; 4) dans ChatGPT,
+   clic droit sur l'image obtenue → « Copier l'image », revenez dans le logiciel
+   et faites Ctrl+V (ou glissez l'image enregistrée dans le panneau). Elle devient
+   le visuel « Après » (recadrée au format de la photo), sert au PDF et reste
+   enregistrée avec la proposition. La photo du client passe par votre compte
+   ChatGPT ; le logiciel ne s'y connecte jamais lui-même. Si le presse-papiers est
+   refusé, le visuel est enregistré dans vos Téléchargements.
 Annuler / Rétablir (ou Ctrl+Z / Ctrl+Y) sont toujours en haut à gauche.
 Le menu « … » garde l'export pour une IA d'images, l'optimisation sur ce PC et
 la retouche de la photo (gomme, décor).
