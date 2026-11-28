@@ -20,6 +20,7 @@ export function Presentation({
   onPdf,
   ia,
   externe,
+  pontAuDepart = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -43,6 +44,8 @@ export function Presentation({
   };
   /** Rendu fait dans ChatGPT (compte de l'utilisateur) puis réimporté. */
   externe?: { consigne: string; importer: (image: Blob) => Promise<void> };
+  /** Ouvre directement le panneau « Rendu avec ChatGPT ». */
+  pontAuDepart?: boolean;
 }) {
   const [part, setPart] = useState(0.5);
   const [liste, setListe] = useState(false);
@@ -53,6 +56,9 @@ export function Presentation({
   const zone = useRef<HTMLDivElement>(null);
   const glisse = useRef(false);
 
+  useEffect(() => {
+    if (open) setPont(pontAuDepart);
+  }, [open, pontAuDepart]);
   useEffect(() => {
     if (!open) return;
     setPart(0.5);
@@ -68,12 +74,12 @@ export function Presentation({
   };
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[#1d1915] text-white">
-      <header className="flex items-center gap-3 px-5 py-3">
+      <header className="flex flex-wrap items-center gap-3 px-5 py-3">
         <div className="min-w-0">
           <p className="truncate font-display text-xl">{titre}</p>
           <p className="truncate text-xs text-white/60">{sousTitre}</p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {ia?.image && (
             <div className="flex rounded-md bg-white/10 p-0.5 text-xs" role="group" aria-label="Visuel affiché">
               <button type="button" onClick={() => setRealiste(false)} className={cn("rounded px-2.5 py-1", !realiste && "bg-white text-[#1d1915]")}>Montage</button>

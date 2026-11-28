@@ -106,7 +106,7 @@ Ouvrez « Espace Pro Décorateurs » : l'onglet « Espace décorateur » s'ouvre
    la composition ne change pas.
    Module : dossier runtime\ia-rendu (≈ 4 Go, hors ZIP et hors GitHub) ; sans
    lui, le bouton n'apparaît pas et tout le reste fonctionne.
-8. « Rendu avec ChatGPT » (dans la présentation) : pour un rendu « grande IA »
+8. « Rendu avec ChatGPT » (en haut de l'atelier, à côté de « Présenter au client ») : pour un rendu « grande IA »
    (soleil, reflets, tout redessiné), avec votre propre abonnement ChatGPT, sans
    clé API. 1) « Copier » le visuel ; 2) « Ouvrir » ChatGPT et coller (Ctrl+V) ;
    3) « Copier » la consigne, la coller dans ChatGPT et envoyer ; 4) dans ChatGPT,

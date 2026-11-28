@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Columns2, Image as ImageIcon, Loader2, MoreHorizontal, Package, Paintbrush2, Presentation as IconePresentation, Redo2, ShoppingBag, Sparkles, Undo2 } from "lucide-react";
+import { Bot, Columns2, Image as ImageIcon, Loader2, MoreHorizontal, Package, Paintbrush2, Presentation as IconePresentation, Redo2, ShoppingBag, Sparkles, Undo2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ListeSurfaces, PanneauSurface } from "@/components/decor/panneau-surface";
 import { MaSelectionSheet } from "@/components/decor/ma-selection";
@@ -155,6 +155,7 @@ export function Workspace({
   const [avantPart, setAvantPart] = useState<number | null>(null);
   const [selOuverte, setSelOuverte] = useState(false);
   const [presente, setPresente] = useState<{ avant: string | null; apres: string | null } | null>(null);
+  const [pontDemande, setPontDemande] = useState(false);
   const [tarifPro, setTarifPro] = useState(() => localStorageGet("studio-tarif") === "pro");
   const dirty = useRef(false);
   const saving = useRef(false);
@@ -1256,7 +1257,10 @@ export function Workspace({
           <Button size="sm" variant="outline" onClick={() => setSelOuverte(true)}>
             <ShoppingBag className="h-4 w-4" /> Ma sélection{nbSel ? ` (${nbSel})` : ""}
           </Button>
-          <Button size="sm" variant="hero" disabled={!baseImg} onClick={() => void presenter()}>
+          <Button size="sm" variant="outline" disabled={!baseImg} onClick={() => { setPontDemande(true); void presenter(); }} title="Faire un rendu photo avec votre ChatGPT puis le reprendre ici">
+            <Bot className="h-4 w-4" /> Rendu avec ChatGPT
+          </Button>
+          <Button size="sm" variant="hero" disabled={!baseImg} onClick={() => { setPontDemande(false); void presenter(); }}>
             <IconePresentation className="h-4 w-4" /> Présenter au client
           </Button>
           <DropdownMenu>
@@ -1364,6 +1368,7 @@ export function Workspace({
         apres={presente?.apres ?? null}
         sel={selection}
         onPdf={telechargerPdf}
+        pontAuDepart={pontDemande}
         externe={{
           consigne: finitionsTexte.length ? `${lireConsigne()}
 

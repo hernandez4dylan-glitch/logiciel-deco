@@ -183,7 +183,7 @@ Demande : un visuel « comme une IA » (réaliste), après essai concluant sur l
 
 ## Rendu avec ChatGPT (28/11/2026)
 Demande : obtenir un rendu de la qualité d'une grande IA en ligne avec l'abonnement ChatGPT Pro (pas de clé API).
-- [x] Panneau « Rendu avec ChatGPT » dans la présentation : copier le visuel (PNG), ouvrir chatgpt.com, copier la
+- [x] Bouton « Rendu avec ChatGPT » dans la barre de l'atelier (ouvre la présentation et le panneau) et dans la présentation : copier le visuel (PNG), ouvrir chatgpt.com, copier la
   consigne (celle d'« Exporter pour l'IA » + finitions), reprendre l'image par Ctrl+V, glisser-déposer ou fichier.
   Replis : visuel téléchargé si le presse-papiers est refusé, ancienne commande de copie pour la consigne.
 - [x] Image reprise recadrée au format de la photo (rideau avant / après aligné), rangée dans les photos, enregistrée
